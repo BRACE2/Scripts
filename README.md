@@ -9,8 +9,9 @@
 
 <details>
 <summary>
-[brace2-plots](brace2-plots) [source](https://stackoverflow.com/questions/35851201/how-can-i-share-matplotlib-style)
+<a href="brace2-plots">brace2-plots</a> 
 </summary>
+  <a href="https://stackoverflow.com/questions/35851201/how-can-i-share-matplotlib-style">source</a>
   Contributors: @claudioperez, Arpit Nema
 </details>
 
