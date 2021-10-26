@@ -1,4 +1,12 @@
-# Claudio Perez
+#!/usr/bin/env python
+#  ____  _____            _____ ______ ___
+# |  _ \|  __ \     /\   / ____|  ____|__ \
+# | |_) | |__) |   /  \ | |    | |__     ) |
+# |  _ <|  _  /   / /\ \| |    |  __|   / /
+# | |_) | | \ \  / ____ \ |____| |____ / /_
+# |____/|_|  \_\/_/    \_\_____|______|____|
+#
+# claudio perez
 """
 This script generates a text summary of a given CSMIP zip file.
 
