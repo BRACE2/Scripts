@@ -1,0 +1,20 @@
+Post-processing / Documentation:
+  brace2-plots:
+    authors:
+      Claudio Perez: claudio_perez@berkeley.edu
+
+
+Ground motion processing:
+  quakeio <>:
+  csmip-summary:
+    authors: {Claudio Perez: claudio_perez@berkeley.edu}
+    about: |
+      Python script for creating summaries of CSMIP ground motion
+      records
+
+
+Other / Misc.:
+  c-utilities:
+    authors: {Claudio Perez: claudio_perez@berkeley.edu}
+    about: Small utility programs and libraries written in C
+
