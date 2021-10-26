@@ -45,7 +45,6 @@ named `Summary.txt` in the same directory.
 >> python summarize.py 58658_003_20210628_18.29.26.P.zip > Summary.txt
 
 """
-
 # standard library imports; these are installed by default
 import re
 import sys
