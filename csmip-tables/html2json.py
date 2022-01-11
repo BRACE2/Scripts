@@ -8,6 +8,9 @@
 #
 # claudio perez
 """
+This script takes an HTML page, extracts its tables, and prints
+a JSON representation of the data.
+
 Example:
 $ pandoc ../el-centro/documentation/summary-table.md 2>/dev/null | python html2json.py
 """
@@ -19,8 +22,6 @@ from elstir.contrib.pandoc import Pandoc
 
 
 def pull_csmip(csmip_id:str)->str:
-    """
-    """
     return requests.get(
             f"https://www.strongmotioncenter.org/cgi-bin/CESMD/stationhtml.pl?stationID={csmip_id}&network=CGS"
            ).text
@@ -39,21 +40,26 @@ def dict2latex(data:dict, i=0)->str:
     body = "\n    ".join([f"{k} & {v}\\\\ \\hline" for k,v in data.items()])
     tail = f"""
     \\end{{tabular}}
-    \\label{{tab:app-{i}}}
+    \\label{{tab:num-{i}}}
 \\end{{table}}
 \\vspace*{{2cm}}
 """
     return head + "    " + body + tail
 
-def table2dict(html_table:str, output=None)->dict:
+def table2dict(html_table, output=None)->dict:
     """
+    This function takes HTML tables with rows of the form:
+
+        <tr>
+          <td>key1</td> <td>value1</td>
+        </tr>
     """
     output = {} if output is None else output
-    #tree = BeautifulSoup(html_table, "html.parser")
     tree = html_table
     tables = tree.find_all("table")
 
     if tables:
+        # the tree has multiple tables, recurse
         return [table2dict(table) for table in tables if table]
 
     else:
