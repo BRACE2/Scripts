@@ -19,35 +19,38 @@
 
 NAME = "elastica.py"
 HELP = f"""
-usage: {NAME} [OPTIONS] SAM_FILE
-   or  {NAME} [OPTIONS] SAM_FILE RES_FILE
+usage: {NAME} <sam-file>
+       {NAME} [options] <sam-file>
+       {NAME} [options] <sam-file> <res-file>
 
 Generate a plot of a structural model.
 
 Positional Arguments:
 
-    SAM_FILE                 JSON file defining the structural model.
-    RES_FILE                 JSON or YAML file defining a structural response.
+    SAM_FILE                     JSON file defining the structural model.
+    RES_FILE                     JSON or YAML file defining a structural
+                                 response.
 
 Options:
-    -s/--scale SCALE         Set displacement scale factor.
-    -C/--coord [L,T,]V       Define global coordinate system.
+    -s/--scale <scale>           Set displacement scale factor.
+    -d/--displ NODE:DOF...       Apply a unit displacement at node with tag NODE
+                                 in direction DOF.
 
-    -d/--displ NODE:DOF...   Apply a unit displacement at node with tag NODE
-                             in direction DOF
+    -V/--view  {{elev|plan|sect}}  Set camera view.
+    -p PLOT_OPT                  Specify plotting option.
+    --vert INT                   Specify vertical axis.
 
-    -V/--view  VIEW          Set camera view.
-    --vert INT
-    -p PLOT_OPT              Specify plotting option
-
-    -h/--help                Print this message and exit.
-    -o/--write FILE          Save plot to FILE.
+    -o/--write FILE              Save plot to FILE.
+    -h/--help                    Print this message and exit.
+       --man
 
 Examples:
+        $ {NAME} sam.json
+
     Plot displaced structure with unit translation at nodes
     5, 3 and 2 in direction 2 at scale of 100:
 
-        $ {NAME} -d 5:2,3:2,2:2 -s100 sam.json
+        $ {NAME} -d 5:2,3:2,2:2 -s100 --vert 2 sam.json
 """
 
 # The following Python packages are required by this script:
@@ -245,6 +248,7 @@ def plot_displ(frame, res, ax=None, axes=None):
 
 
 def parse_args(argv)->dict:
+    # default options
     opts = {
         "mode":       1,
         "sam_file":   None,
