@@ -23,11 +23,14 @@ Positional Arguments:
     SAM_FILE                 JSON file defining the structural model.
     RES_FILE                 JSON or YAML file defining a structural response.
 
-Options
+Options:
     -s/--scale SCALE         Set displacement scale factor.
     -C/--coord [L,T,]V       Define global coordinate system.
+    --vert INT
     -d/--displ NODE:DOF...   Apply a unit displacement at node with tag NODE
                              in direction DOF
+
+    -p PLOT_OPT              Specify plotting option
 
     -h/--help                Print this message and exit.
     -o/--write FILE          Save plot to FILE.
@@ -165,21 +168,29 @@ def new_3d_axis():
     ax.set_axis_off()
     return ax
 
+def add_origin(ax,scale):
+    xyz = np.zeros((3,3))
+    uvw = np.eye(3)*scale
+    ax.quiver(*xyz, *uvw, arrow_length_ratio=0.1, color="black")
+    return ax
+
 def set_axis_limits(ax):
     "Find and set axes limits"
     aspect = [ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')]
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
 
-def plot(frame):
+def plot(frame, axes=None):
+    if axes is None: axes = [0,2,1]
     props = {"frame": {"color": "grey", "alpha": 0.6}}
     ax = new_3d_axis()
     for e in frame["elems"].values():
-        x,y,z = np.array(e["crd"]).T
-        ax.plot(x,z,y, **props["frame"])
+        x,y,z = np.array(e["crd"]).T[axes]
+        ax.plot(x,y,z, **props["frame"])
     return ax
 
-def plot_nodes(frame, displ=None, ax=None):
+def plot_nodes(frame, displ=None, axes=None, ax=None):
+    if axes is None: axes = [0,2,1]
     ax = ax or new_3d_axis()
     displ = displ or {}
     Zero = np.zeros(NDM)
@@ -192,13 +203,14 @@ def plot_nodes(frame, displ=None, ax=None):
     for i,n in enumerate(frame["nodes"].values()):
         coord[i,:] += displ.get(n["name"],Zero)[:3]
 
-    x,y,z = coord.T
-    ax.scatter(x, z, y, **props)
+    x,y,z = coord.T[axes]
+    ax.scatter(x, y, z, **props)
     return ax
 
-def plot_displ(frame, res, ax=None):
+def plot_displ(frame, res, ax=None, axes=None):
     props = {"color": "red"}
     ax = ax or new_3d_axis()
+    if axes is None: axes = [0,2,1]
     for el in frame["elems"].values():
         # exclude zero-length elements
         if "zero" not in el["type"].lower():
@@ -208,8 +220,8 @@ def plot_displ(frame, res, ax=None):
                     for u in res.get(n,[0.0]*frame["nodes"][n]["ndf"])
             ]
             vect = el["trsfm"]["vecInLocXZPlane"]
-            x,y,z = displaced_profile(el["crd"], glob_displ, vect=vect)
-            ax.plot(x,z,y, **props)
+            x,y,z = displaced_profile(el["crd"], glob_displ, vect=vect)[axes]
+            ax.plot(x,y,z, **props)
     return ax
 
 
@@ -225,7 +237,9 @@ def parse_args(argv)->dict:
         "write_file": None,
         "displ":      [],
         "scale":      100.0,
-        "displ_only": False
+        "axes" :      [0,2,1],
+        "displ_only": False,
+        "plot_opts":  []
     }
     args = iter(argv[1:])
     for arg in iter(args):
@@ -242,6 +256,14 @@ def parse_args(argv)->dict:
             opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
         elif arg == "--scale":
             opts["scale"] = float(next(args))
+
+        elif arg == "--vert":
+            vert = int(next(args))
+            tran = 2 if vert == 1 else 1
+            opts["axes"][1:] = [tran, vert]
+
+        elif arg[:2] == "-p":
+            opts["plot_opts"].append(arg[2:] if len(arg) > 2 else next(args))
 
         elif arg[:2] == "-m":
             opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
@@ -261,12 +283,12 @@ def parse_args(argv)->dict:
 if __name__ == "__main__":
     import json, yaml
     opts = parse_args(sys.argv)
-    print(opts)
+    axes = opts["axes"]
 
     with open(opts["sam_file"], "r") as f:
         frm = wireframe(json.load(f)["StructuralAnalysisModel"])
 
-    ax = plot(frm) if not opts["displ_only"] else None
+    ax = plot(frm,axes=axes) if not opts["displ_only"] else None
        
     if opts["res_file"] is not None:
         with open(opts["res_file"], "r") as f:
@@ -277,17 +299,20 @@ if __name__ == "__main__":
         v = res.setdefault(n,[0.0]*frm["nodes"][n]["ndf"])
         v[d] += 1.0
 
-    if opts["scale"] != 1.0:
-        scale = opts["scale"]
+    # apply scale
+    scale = opts["scale"]
+    if scale != 1.0:
         for n in res.values():
             for i in range(len(n)):
                 n[i] *= scale
 
-    ax = plot_nodes(frm, res, ax=ax)
+    ax = plot_nodes(frm, res, ax=ax, axes=axes)
     if res:
-        plot_displ(frm, res, ax=ax)
+        plot_displ(frm, res, axes=axes, ax=ax)
 
+    # Handle plot formatting
     set_axis_limits(ax)
+    if "origin" in opts["plot_opts"]: add_origin(ax, scale)
 
     import matplotlib.pyplot as plt
     plt.show()
