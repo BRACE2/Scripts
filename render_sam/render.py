@@ -20,18 +20,23 @@ usage: {NAME} [OPTIONS] SAM_FILE
 
 Positional Arguments:
 
-    SAM_FILE               JSON file defining the structural model.
-
-    RES_FILE               JSON or YAML file defining a structural response.
+    SAM_FILE                 JSON file defining the structural model.
+    RES_FILE                 JSON or YAML file defining a structural response.
 
 Options
-    -h/--help              Print this message and exit.
-    -o/--write FILE        Save plot to FILE.
+    -s/--scale SCALE         Set displacement scale factor.
+    -C/--coord [L,T,]V       Define global coordinate system.
+    -d/--displ NODE:DOF...   Apply a unit displacement at node with tag NODE
+                             in direction DOF
 
-    -C/--coord [L,T,]V     Define global coordinate system.
-    -d/--displ NODE:DOF    Apply a unit displacement at node with tag NODE
-                           in direction DOF
+    -h/--help                Print this message and exit.
+    -o/--write FILE          Save plot to FILE.
 
+Examples:
+    Plot displaced structure with unit translation at nodes
+    5, 3 and 2 in direction 2 at scale of 100:
+
+        $ {NAME} -d 5:2,3:2,2:2 -s100 sam.json
 """
 
 # The following Python packages are required by this script:
@@ -46,6 +51,7 @@ import sys
 import numpy as np
 from scipy.linalg import block_diag
 import matplotlib.pyplot as plt
+NDM=3 # this script currently assumes ndm=3
 
 # Data shaping / Misc.
 #----------------------------------------------------
@@ -58,9 +64,10 @@ def wireframe(sam:dict)->dict:
     return dict with the form:
         {<elem tag>: {"crd": [<coordinates>], ...}}
     """
-    geom = sam["geometry"]
-    trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
+    geom  = sam["geometry"]
+    coord = np.array([n["crd"] for n in geom["nodes"]])
     nodes = {n["name"]: n for n in geom["nodes"]}
+    trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
     elems =  {
       e["name"]: dict(
         **e, 
@@ -68,7 +75,7 @@ def wireframe(sam:dict)->dict:
         trsfm=trsfm[e["crdTransformation"]] if "crdTransformation" in e else None
       ) for e in geom["elements"]
     }
-    return dict(nodes=nodes, elems=elems)
+    return dict(nodes=nodes, elems=elems, coord=coord)
 
 # Kinematics
 #----------------------------------------------------
@@ -80,15 +87,15 @@ def wireframe(sam:dict)->dict:
 elev_dofs = lambda u: u[[1,2]]
 plan_dofs = lambda u: u[[3,4]]
 
-def elastic_curve(x, v, L, scale=1.0)->np.ndarray:
+def elastic_curve(x, v, L)->np.ndarray:
     "compute points along Euler's elastica"
     vi, vj = v
     xi = x/L                        # local coordinates
-    N1 = 1.-3*xi**2+2*xi**3
-    N2 = L*(xi-2*xi**2+xi**3)
+    N1 = 1.-3.*xi**2+2.*xi**3
+    N2 = L*(xi-2.*xi**2+xi**3)
     N3 = 3.*xi**2-2*xi**3
     N4 = L*(xi**3-xi**2)
-    y = np.array(vi*N2+vj*N4)*scale
+    y = np.array(vi*N2+vj*N4)
     return y.flatten()
 
 def linear_deformations(u,L):
@@ -126,7 +133,6 @@ def displaced_profile(
         coord: np.ndarray,
         displ:np.ndarray,  #: Displacements
         vect=None,         #: Element orientation vector
-        scale:float = 1.0, #: Scale factor
         glob:bool=True,    #: Transform to global coordinates
     )->np.ndarray:
     n = 40
@@ -137,8 +143,8 @@ def displaced_profile(
     v = linear_deformations(block_diag(*[Q]*rep)@displ, L)
     xaxis = np.linspace(0.0, L, n)
 
-    plan_curve = elastic_curve(xaxis, plan_dofs(v), L, scale=scale)
-    elev_curve = elastic_curve(xaxis, elev_dofs(v), L, scale=scale)
+    plan_curve = elastic_curve(xaxis, plan_dofs(v), L)
+    elev_curve = elastic_curve(xaxis, elev_dofs(v), L)
 
     dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
     local_curve = np.stack([xaxis, plan_curve+dy, elev_curve+dz])
@@ -159,8 +165,8 @@ def new_3d_axis():
     ax.set_axis_off()
     return ax
 
-def set_axis(ax):
-    # Make axes limits 
+def set_axis_limits(ax):
+    "Find and set axes limits"
     aspect = [ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')]
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
@@ -173,10 +179,28 @@ def plot(frame):
         ax.plot(x,z,y, **props["frame"])
     return ax
 
+def plot_nodes(frame, displ=None, ax=None):
+    ax = ax or new_3d_axis()
+    displ = displ or {}
+    Zero = np.zeros(NDM)
+    props = {"color": "black",
+             "marker": "s",
+             "s": 3,
+             "zorder": 2}
 
-def plot_displ(frame, res, scale=1.0, ax=None):
+    coord = frame["coord"]
+    for i,n in enumerate(frame["nodes"].values()):
+        coord[i,:] += displ.get(n["name"],Zero)[:3]
+
+    x,y,z = coord.T
+    ax.scatter(x, z, y, **props)
+    return ax
+
+def plot_displ(frame, res, ax=None):
     props = {"color": "red"}
+    ax = ax or new_3d_axis()
     for el in frame["elems"].values():
+        # exclude zero-length elements
         if "zero" not in el["type"].lower():
             glob_displ = [
                 u for n in el["nodes"] 
@@ -184,7 +208,7 @@ def plot_displ(frame, res, scale=1.0, ax=None):
                     for u in res.get(n,[0.0]*frame["nodes"][n]["ndf"])
             ]
             vect = el["trsfm"]["vecInLocXZPlane"]
-            x,y,z = displaced_profile(el["crd"], glob_displ, scale=scale, vect=vect)
+            x,y,z = displaced_profile(el["crd"], glob_displ, vect=vect)
             ax.plot(x,z,y, **props)
     return ax
 
@@ -195,11 +219,13 @@ def plot_displ(frame, res, scale=1.0, ax=None):
 
 def parse_args(argv)->dict:
     opts = {
-        "mode": 1,
+        "mode":       1,
         "sam_file":   None,
         "res_file":   None,
         "write_file": None,
-        "displ": [],
+        "displ":      [],
+        "scale":      100.0,
+        "displ_only": False
     }
     args = iter(argv[1:])
     for arg in iter(args):
@@ -211,11 +237,18 @@ def parse_args(argv)->dict:
             node_dof = arg[2:] if len(arg) > 2 else next(args)
             for nd in node_dof.split(","):
                 opts["displ"].append(tuple(map(int,nd.split(":"))))
-            print(opts["displ"])
+
+        elif arg[:2] == "-s":
+            opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
+        elif arg == "--scale":
+            opts["scale"] = float(next(args))
+
         elif arg[:2] == "-m":
             opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
         elif arg[:2] == "-o":
             opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
+        elif arg == "--displ-only":
+            opts["displ_only"] = True
         elif not opts["sam_file"]:
             opts["sam_file"] = arg
         else:
@@ -228,11 +261,13 @@ def parse_args(argv)->dict:
 if __name__ == "__main__":
     import json, yaml
     opts = parse_args(sys.argv)
+    print(opts)
 
     with open(opts["sam_file"], "r") as f:
         frm = wireframe(json.load(f)["StructuralAnalysisModel"])
 
-    ax = plot(frm)
+    ax = plot(frm) if not opts["displ_only"] else None
+       
     if opts["res_file"] is not None:
         with open(opts["res_file"], "r") as f:
             res = yaml.load(f,Loader=yaml.Loader)[opts["mode"]]
@@ -242,11 +277,17 @@ if __name__ == "__main__":
         v = res.setdefault(n,[0.0]*frm["nodes"][n]["ndf"])
         v[d] += 1.0
 
+    if opts["scale"] != 1.0:
+        scale = opts["scale"]
+        for n in res.values():
+            for i in range(len(n)):
+                n[i] *= scale
+
+    ax = plot_nodes(frm, res, ax=ax)
     if res:
         plot_displ(frm, res, ax=ax)
-    print(res)
 
-    set_axis(ax)
+    set_axis_limits(ax)
 
     import matplotlib.pyplot as plt
     plt.show()
