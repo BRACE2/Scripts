@@ -1,7 +1,11 @@
 #!/bin/env -S ipython --
+
+# >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
+#
 # This script plots the geometry of a structural
 # model given a SAM JSON file. The SAM JSON structure
 # was developed by the NHERI SimCenter.
+#
 #
 # This script is broken into the following sections:
 #
@@ -17,6 +21,8 @@ NAME = "elastica.py"
 HELP = f"""
 usage: {NAME} [OPTIONS] SAM_FILE
        {NAME} [OPTIONS] SAM_FILE RES_FILE
+
+Generate a plot of a structural model.
 
 Positional Arguments:
 
