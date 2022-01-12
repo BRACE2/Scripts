@@ -20,7 +20,7 @@
 NAME = "elastica.py"
 HELP = f"""
 usage: {NAME} [OPTIONS] SAM_FILE
-       {NAME} [OPTIONS] SAM_FILE RES_FILE
+   or  {NAME} [OPTIONS] SAM_FILE RES_FILE
 
 Generate a plot of a structural model.
 
@@ -32,10 +32,12 @@ Positional Arguments:
 Options:
     -s/--scale SCALE         Set displacement scale factor.
     -C/--coord [L,T,]V       Define global coordinate system.
-    --vert INT
+
     -d/--displ NODE:DOF...   Apply a unit displacement at node with tag NODE
                              in direction DOF
 
+    -V/--view  VIEW          Set camera view.
+    --vert INT
     -p PLOT_OPT              Specify plotting option
 
     -h/--help                Print this message and exit.
@@ -168,6 +170,13 @@ def displaced_profile(
 # Plotting
 #----------------------------------------------------
 
+VIEWS = {
+    "plan":    dict(azim= 0, elev=90),
+    "sect":    dict(azim= 0, elev= 0),
+    "elev":    dict(azim=90, elev= 0),
+    "default": dict(azim=45, elev=35)
+}
+
 def new_3d_axis():
     _, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
     ax.set_autoscale_on(True)
@@ -245,42 +254,56 @@ def parse_args(argv)->dict:
         "scale":      100.0,
         "axes" :      [0,2,1],
         "displ_only": False,
-        "plot_opts":  []
+        "plot_opts":  [],
+        "view": "default"
     }
     args = iter(argv[1:])
     for arg in iter(args):
-        if arg == "--help" or arg == "-h":
-            print(HELP) is None and sys.exit()
-        elif arg == "--install":
-            pass
-        elif arg[:2] == "-d":
-            node_dof = arg[2:] if len(arg) > 2 else next(args)
-            for nd in node_dof.split(","):
-                opts["displ"].append(tuple(map(int,nd.split(":"))))
+        try:
+            if arg == "--help" or arg == "-h":
+                print(HELP) is None and sys.exit()
 
-        elif arg[:2] == "-s":
-            opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
-        elif arg == "--scale":
-            opts["scale"] = float(next(args))
+            elif arg == "--install":
+                pass
 
-        elif arg == "--vert":
-            vert = int(next(args))
-            tran = 2 if vert == 1 else 1
-            opts["axes"][1:] = [tran, vert]
+            elif arg[:2] == "-d":
+                node_dof = arg[2:] if len(arg) > 2 else next(args)
+                for nd in node_dof.split(","):
+                    opts["displ"].append(tuple(map(int,nd.split(":"))))
 
-        elif arg[:2] == "-p":
-            opts["plot_opts"].append(arg[2:] if len(arg) > 2 else next(args))
+            elif arg[:2] == "-s":
+                opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
 
-        elif arg[:2] == "-m":
-            opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
-        elif arg[:2] == "-o":
-            opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
-        elif arg == "--displ-only":
-            opts["displ_only"] = True
-        elif not opts["sam_file"]:
-            opts["sam_file"] = arg
-        else:
-            opts["res_file"] = arg
+            elif arg == "--scale":
+                opts["scale"] = float(next(args))
+
+            elif arg == "--vert":
+                vert = int(next(args))
+                tran = 2 if vert == 1 else 1
+                opts["axes"][1:] = [tran, vert]
+
+            elif arg[:2] == "-p":
+                opts["plot_opts"].append(arg[2:] if len(arg) > 2 else next(args))
+            
+            elif arg[:2] == "-V":
+                opts["view"] = arg[2:] if len(arg) > 2 else next(args)
+
+            elif arg[:2] == "-m":
+                opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
+
+            elif arg[:2] == "-o":
+                opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
+
+            elif arg == "--displ-only":
+                opts["displ_only"] = True
+
+            elif not opts["sam_file"]:
+                opts["sam_file"] = arg
+
+            else:
+                opts["res_file"] = arg
+        except StopIteration:
+            print(f"ERROR -- Argument '{arg}' expected value")
     return opts
 
 # Main script
@@ -288,8 +311,13 @@ def parse_args(argv)->dict:
 
 if __name__ == "__main__":
     import json, yaml
+# az, el = 45, 35
     opts = parse_args(sys.argv)
     axes = opts["axes"]
+
+    if opts["sam_file"] is None:
+        print("ERROR -- expected positional argument SAM_FILE")
+        sys.exit()
 
     with open(opts["sam_file"], "r") as f:
         frm = wireframe(json.load(f)["StructuralAnalysisModel"])
@@ -318,8 +346,12 @@ if __name__ == "__main__":
 
     # Handle plot formatting
     set_axis_limits(ax)
+    ax.view_init(**VIEWS[opts["view"]])
     if "origin" in opts["plot_opts"]: add_origin(ax, scale)
 
-    import matplotlib.pyplot as plt
-    plt.show()
+
+    if opts["write_file"]:
+        ax.figure.savefig(opts["write_file"])
+    else:
+        plt.show()
 
