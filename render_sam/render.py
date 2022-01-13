@@ -107,6 +107,11 @@ def wireframe(sam:dict)->dict:
     }
     return dict(nodes=nodes, elems=elems, coord=coord)
 
+def read_model(filename:str)->dict:
+    import json
+    with open(filename,"r") as f:
+        return wireframe(json.load(f)["StructuralAnalysisModel"])
+
 # Kinematics
 #----------------------------------------------------
 
@@ -228,7 +233,7 @@ def set_axis_limits(ax):
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
 
-def plot(frame, axes=None):
+def plot_skeletal(frame, axes=None):
     if axes is None: axes = [0,2,1]
     props = {"frame": {"color": "grey", "alpha": 0.6}}
     ax = new_3d_axis()
@@ -236,6 +241,36 @@ def plot(frame, axes=None):
         x,y,z = np.array(e["crd"]).T[axes]
         ax.plot(x,y,z, **props["frame"])
     return ax
+
+def plot_plotly(model, axes=None):
+    import plotly.graph_objects as go
+    fig = go.Figure(
+            go.Scatter3d(**plot_skeletal_plotly(model,axes)),
+            go.Layout(
+                scene=dict(aspectmode='data',
+                     xaxis_visible=False,
+                     yaxis_visible=False,
+                     zaxis_visible=False,
+                     camera=dict(
+                         projection={"type": "perspective"}
+                     )
+                ),
+                showlegend=False
+            )
+        )
+    return fig
+
+def plot_skeletal_plotly(model, axes=None):
+    if axes is None: axes = [0,2,1]
+    props = {"frame": {"color": "grey", "alpha": 0.6}}
+    ax = new_3d_axis()
+    coords = np.zeros((len(model["elems"])*3,NDM))
+    coords.fill(np.nan)
+    for i,e in enumerate(model["elems"].values()):
+        coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+    x,y,z = coords.T
+    return {"mode": "lines", "x": x, "y": y, "z": z}
+    
 
 def plot_nodes(frame, displ=None, axes=None, ax=None):
     if axes is None: axes = [0,2,1]
@@ -364,34 +399,43 @@ def install_me(install_dir=None):
     import subprocess
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
 
+TESTS = [
+    (False,"{NAME} sam.json -d 2:plan -s"),
+    (True, "{NAME} sam.json -d 2:plan -s50"),
+    (True, "{NAME} sam.json -d 2:3    -s50"),
+    (True, "{NAME} sam.json -d 5:2,3:2,2:2 -s100 --vert 2 sam.json")
+]
+
 # Main script
 #----------------------------------------------------
 # The following code is only executed when the file
 # is invoked as a script.
 
-if __name__ == "__main__":
-    import json
-    opts = parse_args(sys.argv)
+def render(sam_file, res_file=None, **opts):
     axes = opts["axes"]
 
-    if opts["sam_file"] is None:
+    if sam_file is None:
         print("ERROR -- expected positional argument <sam-file>")
-        print(f"         Run '{NAME} --help' for more information")
         sys.exit()
 
-    with open(opts["sam_file"], "r") as f:
-        frm = wireframe(json.load(f)["StructuralAnalysisModel"])
+    model = read_model(sam_file)
 
-    ax = plot(frm,axes=axes) if not opts["displ_only"] else None
+    if not opts["displ_only"]:
+        ax = plot_skeletal(model,axes=axes)
+    else:
+        ax = None
        
-    if opts["res_file"] is not None:
-        with open(opts["res_file"], "r") as f:
+    if res_file is not None:
+        with open(res_file, "r") as f:
             res = yaml.load(f,Loader=yaml.Loader)[opts["mode"]]
     else:
         res = {}
     for n,d in opts["displ"]:
-        v = res.setdefault(n,[0.0]*frm["nodes"][n]["ndf"])
-        v[d] += 1.0
+        v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
+        if d < 3: # translational dof
+            v[d] += 1.0
+        else:
+            v[d] += 0.1
 
     # apply scale
     scale = opts["scale"]
@@ -400,9 +444,10 @@ if __name__ == "__main__":
             for i in range(len(n)):
                 n[i] *= scale
 
-    ax = plot_nodes(frm, res, ax=ax, axes=axes)
+
+    ax = plot_nodes(model, res, ax=ax, axes=axes)
     if res:
-        plot_displ(frm, res, axes=axes, ax=ax)
+        plot_displ(model, res, axes=axes, ax=ax)
 
     # Handle plot formatting
     set_axis_limits(ax)
@@ -411,9 +456,78 @@ if __name__ == "__main__":
 
     if opts["write_file"]:
     # write plot to file if file name provided
-        ax.figure.savefig(opts["write_file"])
+        if "html" in opts["write_file"]:
+            fig = plot_plotly(model,axes)
+            import plotly
+            plotly.offline.plot(fig,
+                    filename=opts["write_file"],
+                    auto_open=False)
+        else:
+            ax.figure.savefig(opts["write_file"])
     else:
     # otherwise show in new window
         import matplotlib.pyplot as plt
         plt.show()
+    return ax
+
+if __name__ == "__main__":
+
+    opts = parse_args(sys.argv)
+    try:
+        render(**opts)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        print(f"         Run '{NAME} --help' for more information")
+        sys.exit()
+
+#    axes = opts["axes"]
+#
+#    if opts["sam_file"] is None:
+#        print("ERROR -- expected positional argument <sam-file>")
+#        sys.exit()
+#
+#    model = read_model(opts["sam_file"])
+#
+#    if not opts["displ_only"]:
+#        ax = plot_skeletal(model,axes=axes)
+#    else:
+#        ax = None
+#       
+#    if opts["res_file"] is not None:
+#        with open(opts["res_file"], "r") as f:
+#            res = yaml.load(f,Loader=yaml.Loader)[opts["mode"]]
+#    else:
+#        res = {}
+#    for n,d in opts["displ"]:
+#        v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
+#        if d < 3: # translational dof
+#            v[d] += 1.0
+#        else:
+#            v[d] += 0.1
+#
+#    # apply scale
+#    scale = opts["scale"]
+#    if scale != 1.0:
+#        for n in res.values():
+#            for i in range(len(n)):
+#                n[i] *= scale
+#
+#
+#    ax = plot_nodes(model, res, ax=ax, axes=axes)
+#    if res:
+#        plot_displ(model, res, axes=axes, ax=ax)
+#
+#    # Handle plot formatting
+#    set_axis_limits(ax)
+#    ax.view_init(**VIEWS[opts["view"]])
+#    if "origin" in opts["plot_opts"]: add_origin(ax, scale)
+#
+#    if opts["write_file"]:
+#    # write plot to file if file name provided
+#        ax.figure.savefig(opts["write_file"])
+#    else:
+#    # otherwise show in new window
+#        import matplotlib.pyplot as plt
+#        plt.show()
+
 
