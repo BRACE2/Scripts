@@ -248,35 +248,6 @@ def plot_skeletal(frame, axes=None):
         ax.plot(x,y,z, **props["frame"])
     return ax
 
-def plot_plotly(model, axes=None):
-    import plotly.graph_objects as go
-    fig = go.Figure(
-            go.Scatter3d(**plot_skeletal_plotly(model,axes)),
-            go.Layout(
-                scene=dict(aspectmode='data',
-                     xaxis_visible=False,
-                     yaxis_visible=False,
-                     zaxis_visible=False,
-                     camera=dict(
-                         projection={"type": "perspective"}
-                     )
-                ),
-                showlegend=False
-            )
-        )
-    return fig
-
-def plot_skeletal_plotly(model, axes=None):
-    if axes is None: axes = [0,2,1]
-    props = {"frame": {"color": "grey", "alpha": 0.6}}
-    ax = new_3d_axis()
-    coords = np.zeros((len(model["elems"])*3,NDM))
-    coords.fill(np.nan)
-    for i,e in enumerate(model["elems"].values()):
-        coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
-    x,y,z = coords.T
-    return {"mode": "lines", "x": x, "y": y, "z": z}
-    
 
 def plot_nodes(frame, displ=None, axes=None, ax=None):
     if axes is None: axes = [0,2,1]
@@ -313,6 +284,45 @@ def plot_displ(frame:dict, res:dict, ax=None, axes=None):
             ax.plot(x,y,z, **props)
     return ax
 
+class PlotlyPlotter:
+    def __init__(self,axes):
+        self.axes = axes
+    
+    def plot(x,y,**opts):
+        pass
+
+    def plot_frames():
+        pass
+
+def plot_skeletal_plotly(model, axes=None):
+    if axes is None: axes = [0,2,1]
+    props = {"color": "#808080", "alpha": 0.6}
+    ax = new_3d_axis()
+    coords = np.zeros((len(model["elems"])*3,NDM))
+    coords.fill(np.nan)
+    for i,e in enumerate(model["elems"].values()):
+        coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+    x,y,z = coords.T
+    return {"mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
+    
+
+def plot_plotly(model, axes=None):
+    import plotly.graph_objects as go
+    fig = go.Figure(
+            go.Scatter3d(**plot_skeletal_plotly(model,axes)),
+            go.Layout(
+                scene=dict(aspectmode='data',
+                     xaxis_visible=False,
+                     yaxis_visible=False,
+                     zaxis_visible=False,
+                     camera=dict(
+                         projection={"type": "perspective"}
+                     )
+                ),
+                showlegend=False
+            )
+        )
+    return fig
 
 # Script functions
 #----------------------------------------------------
