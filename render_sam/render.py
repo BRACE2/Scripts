@@ -59,8 +59,13 @@ Examples:
 # The following Tcl script can be used to create a results
 # file
 
-RES_SCRIPT = """
-foreach m {$modes}
+EIG_SCRIPT = """
+for {set m 1} {$m <= 3} {incr m} {
+  puts "$m:"
+  foreach n [getNodeTags] {
+    puts "  $n: \[[join [nodeEigenvector $n $m] {, }]\]";
+  }
+}
 """
 
 # The following Python packages are required by this script:
