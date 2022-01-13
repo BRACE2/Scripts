@@ -112,10 +112,12 @@ try:
     import yaml
     import numpy as np
     Array = np.ndarray
+    FLOAT = np.float32
     from scipy.linalg import block_diag
 except:
     yaml = None
     Array = list
+    FLOAT =  float
 NDM=3 # this script currently assumes ndm=3
 
 # Data shaping / Misc.
@@ -133,13 +135,13 @@ def wireframe(sam:dict)->dict:
         {<elem tag>: {"crd": [<coordinates>], ...}}
     """
     geom  = sam["geometry"]
-    coord = np.array([n["crd"] for n in geom["nodes"]])
+    coord = np.array([n["crd"] for n in geom["nodes"]],dtype=FLOAT)
     nodes = {n["name"]: n for n in geom["nodes"]}
     trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
     elems =  {
       e["name"]: dict(
         **e, 
-        crd=np.array([nodes[n]["crd"] for n in e["nodes"]]),
+        crd=np.array([nodes[n]["crd"] for n in e["nodes"]],dtype=FLOAT),
         trsfm=trsfm[e["crdTransformation"]] if "crdTransformation" in e else None
       ) for e in geom["elements"]
     }
@@ -179,11 +181,16 @@ def elastic_curve(x: Array, v: Array, L:float)->Array:
     N2 = L*(xi-2.*xi**2+xi**3)
     N3 = 3.*xi**2-2*xi**3
     N4 = L*(xi**3-xi**2)
-    y = np.array(vi*N2+vj*N4)
+    y = vi*N2+vj*N4
     return y.flatten()
 
 def linear_deformations(u,L):
-    "compute local frame deformations assuming small displacements"
+    """
+    Compute local frame deformations assuming small displacements
+
+    u: 6-vector of displacements in rotated frame
+    L: element length
+    """
     xi, yi, zi, si, ei, pi = range(6)    # Define variables to aid
     xj, yj, zj, sj, ej, pj = range(6,12) # reading array indices.
 
@@ -197,7 +204,7 @@ def linear_deformations(u,L):
         [u[pi] - plan_chord],
         [u[pj] - plan_chord],
         [u[sj] - u[si]],
-    ])
+    ],dtype=FLOAT)
 
 
 def rotation(xyz: Array, vert=(0,0,-1))->Array:
@@ -234,7 +241,8 @@ def displaced_profile(
 
     #dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
     dx,dy,dz = Q@np.linspace(displ[:3], displ[6:9], n).T
-    local_curve = np.stack([xaxis+displ[0], plan_curve+dy, elev_curve+dz])
+    #local_curve = np.stack([xaxis+displ[0], plan_curve+dy, elev_curve+dz])
+    local_curve = np.stack([xaxis+dx[0], plan_curve+dy, elev_curve+dz])
 
     if glob:
         global_curve = Q.T@local_curve + coord[0][None,:].T
@@ -247,10 +255,10 @@ def displaced_profile(
 #----------------------------------------------------
 
 VIEWS = { # pre-defined plot views
-    "plan":    dict(azim= 0, elev=90),
-    "sect":    dict(azim= 0, elev= 0),
-    "elev":    dict(azim=90, elev= 0),
-    "iso":     dict(azim=45, elev=35)
+    "plan":    dict(azim=  0, elev= 90),
+    "sect":    dict(azim=  0, elev=  0),
+    "elev":    dict(azim=-90, elev=  0),
+    "iso":     dict(azim= 45, elev= 35)
 }
 
 def new_3d_axis():
@@ -277,7 +285,7 @@ def plot_skeletal(frame, axes=None):
     props = {"frame": {"color": "grey", "alpha": 0.6}}
     ax = new_3d_axis()
     for e in frame["elems"].values():
-        x,y,z = np.array(e["crd"]).T[axes]
+        x,y,z = e["crd"].T[axes]
         ax.plot(x,y,z, **props["frame"])
     return ax
 
@@ -345,7 +353,7 @@ class GnuPlotter(Plotter):
         coords = np.zeros((len(model["elems"])*3,NDM))
         coords.fill(np.nan)
         for i,e in enumerate(model["elems"].values()):
-            coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+            coords[3*i:3*i+2,:] = e["crd"][:,axes]
         return coords
 
 
@@ -380,7 +388,7 @@ class PlotlyPlotter(Plotter):
     def _get_nodes(self):
         x,y,z = self.model["coord"].T[self.axes]
         keys  = ["tag",]
-        nodes = np.array(list(self.model["nodes"].keys()))[:,None]
+        nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
         return {
                 "x": x, "y": y, "z": z, 
                 "type": "scatter3d","mode": "markers",
@@ -404,7 +412,7 @@ class PlotlyPlotter(Plotter):
         coords = np.zeros((len(model["elems"])*3,NDM))
         coords.fill(np.nan)
         for i,e in enumerate(model["elems"].values()):
-            coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+            coords[3*i:3*i+2,:] = e["crd"][:,axes]
         x,y,z = coords.T
         return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
     
