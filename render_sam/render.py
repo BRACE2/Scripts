@@ -2,6 +2,7 @@
 #!/bin/env -S ipython --
 
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
+# 
 #
 # This script plots the geometry of a structural
 # model given a SAM JSON file. The SAM JSON structure
@@ -27,9 +28,9 @@ usage: {NAME} <sam-file>
 Generate a plot of a structural model.
 
 Positional Arguments:
-    <sam-file>                    JSON file defining the structural model.
-    <res-file>                    JSON or YAML file defining a structural
-                                  response.
+    <sam-file>                     JSON file defining the structural model.
+    <res-file>                     JSON or YAML file defining a structural
+                                   response.
 
 Options:
     -s, --scale  <scale>           Set displacement scale factor.
