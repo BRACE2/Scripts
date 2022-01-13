@@ -43,7 +43,9 @@ Options:
     -h, --help                     Print this message and exit.
 
     -T, --tcl    {{sam|res}}
+"""
 
+EXAMPLES="""
 Examples:
         $ {NAME} sam.json
 
@@ -55,6 +57,7 @@ Examples:
 
 # The following Tcl script can be used to create a results
 # file
+
 RES_SCRIPT = """
 foreach m {$modes}
 """
@@ -114,6 +117,17 @@ def wireframe(sam:dict)->dict:
 elev_dofs = lambda u: u[[1,2]]
 plan_dofs = lambda u: u[[3,4]]
 
+def get_dof_num(dof:str, axes:list):
+    try: return int(dof)
+    except: return {
+            "long": axes[0],
+            "vert": axes[2],
+            "tran": axes[1],
+            "sect": axes[0]+3,
+            "plan": axes[2]+3,
+            "elev": axes[1]+3
+    }[dof]
+
 def elastic_curve(x: Array, v: Array, L:float)->Array:
     "compute points along Euler's elastica"
     vi, vj = v
@@ -168,13 +182,15 @@ def displaced_profile(
     Q = rotation(coord, vect)
     L = np.linalg.norm(coord[1] - coord[0])
     v = linear_deformations(block_diag(*[Q]*rep)@displ, L)
-    xaxis = np.linspace(0.0, L, n)
+    Lnew = L+v[0,0]
+    xaxis = np.linspace(0.0, Lnew, n)
 
-    plan_curve = elastic_curve(xaxis, plan_dofs(v), L)
-    elev_curve = elastic_curve(xaxis, elev_dofs(v), L)
+    plan_curve = elastic_curve(xaxis, plan_dofs(v), Lnew)
+    elev_curve = elastic_curve(xaxis, elev_dofs(v), Lnew)
 
-    dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
-    local_curve = np.stack([xaxis, plan_curve+dy, elev_curve+dz])
+    #dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
+    dx,dy,dz = Q@np.linspace(displ[:3], displ[6:9], n).T
+    local_curve = np.stack([xaxis+displ[0], plan_curve+dy, elev_curve+dz])
 
     if glob:
         global_curve = Q.T@local_curve + coord[0][None,:].T
@@ -295,7 +311,8 @@ def parse_args(argv)->dict:
             elif arg[:2] == "-d":
                 node_dof = arg[2:] if len(arg) > 2 else next(args)
                 for nd in node_dof.split(","):
-                    opts["displ"].append(tuple(map(int,nd.split(":"))))
+                    node, dof = nd.split(":")
+                    opts["displ"].append((int(node), get_dof_num(dof, opts["axes"])))
 
             elif arg[:2] == "-s":
                 opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
