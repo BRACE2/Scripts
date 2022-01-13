@@ -27,24 +27,22 @@ usage: {NAME} <sam-file>
 Generate a plot of a structural model.
 
 Positional Arguments:
-
     <sam-file>                    JSON file defining the structural model.
     <res-file>                    JSON or YAML file defining a structural
                                   response.
 
 Options:
-    -s, --scale <scale>           Set displacement scale factor.
-    -d, --displ <node>:<dof>...   Apply a unit displacement at node with tag <node>
-                                  in direction <dof>.
+    -s, --scale  <scale>           Set displacement scale factor.
+    -d, --displ  <node>:<dof>...   Apply a unit displacement at node with tag
+                                   <node> in direction <dof>.
+    -V, --view   {{elev|plan|sect}}  Set camera view.
+    -p           <plot-option>     Specify plotting option.
+        --vert   <vertical-axis>   Specify vertical axis.
 
-    -V, --view  {{elev|plan|sect}}  Set camera view.
-    -p PLOT_OPT                   Specify plotting option.
-    --vert INT                    Specify vertical axis.
+    -o, --write  <out-file>        Save plot to <out-file>.
+    -h, --help                     Print this message and exit.
 
-    -o, --write FILE              Save plot to FILE.
-    -h, --help                    Print this message and exit.
-
-    -T, --tcl   {{sam|res}}
+    -T, --tcl    {{sam|res}}
 
 Examples:
         $ {NAME} sam.json
@@ -341,6 +339,8 @@ def parse_args(argv)->dict:
         except StopIteration:
             # `next(args)` was called without successive arg
             print(f"ERROR -- Argument '{arg}' expected value")
+            print(f"         Run '{NAME} --help' for more information")
+            sys.exit()
     return opts
 
 def install_me(install_dir=None):
@@ -358,7 +358,8 @@ if __name__ == "__main__":
     axes = opts["axes"]
 
     if opts["sam_file"] is None:
-        print("ERROR -- expected positional argument SAM_FILE")
+        print("ERROR -- expected positional argument <sam-file>")
+        print(f"         Run '{NAME} --help' for more information")
         sys.exit()
 
     with open(opts["sam_file"], "r") as f:

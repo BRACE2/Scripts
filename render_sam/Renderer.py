@@ -35,11 +35,11 @@ quadLocs["Legendre"] = [
 eleC = {
     "ForceBeamColumn3d": "b",
     "DispBeamColumn3d": "r",
-    "Truss2": "g",
-    "Truss": "y",
-    "ZeroLength": "b",
+    "Truss2":        "g",
+    "Truss":         "y",
+    "ZeroLength":    "b",
     "ElasticBeam3d": "w",
-    "TwoNodeLink": 1,
+    "TwoNodeLink":    1,
 }
 eleW = {
     "ForceBeamColumn3d": 2,
