@@ -19,7 +19,7 @@
 
 # The script may be invoked from the command line as follows:
 
-NAME = "elastica.py"
+NAME = "rndr.py"
 HELP = f"""
 usage: {NAME} <sam-file>
        {NAME} [options] <sam-file>
@@ -34,16 +34,24 @@ Positional Arguments:
 
 Options:
     -s, --scale  <scale>           Set displacement scale factor.
-    -d, --displ  <node>:<dof>...   Apply a unit displacement at node with tag
+    -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
                                    <node> in direction <dof>.
     -V, --view   {{elev|plan|sect}}  Set camera view.
-    -p           <plot-option>     Specify plotting option.
-        --vert   <vertical-axis>   Specify vertical axis.
+    -a, --axes   [<L><T>]<V>       Specify model axes.
+        --hide   <object>          Hide <object>; see '--show'.
+        --show   <object>          Show <object>; accepts any of:
+                                      {{origin|frames|frames.displ|nodes|nodes.displ}}
 
-    -o, --write  <out-file>        Save plot to <out-file>.
+    -o, --save   <out-file>        Save plot to <out-file>.
+    -c, --conf
     -h, --help                     Print this message and exit.
 
-    -T, --tcl    {{sam|res}}
+        --script {{sam|res}}
+
+
+    <dof>        {{long | tran | vert | sect | elev | plan}}
+                 {{  0  |   1  |   2  |   3  |   4  |   5 }}
+    <object>     {{origin|frames|frames.displ|nodes|nodes.displ}}
 """
 
 EXAMPLES="""
@@ -53,8 +61,30 @@ Examples:
     Plot displaced structure with unit translation at nodes
     5, 3 and 2 in direction 2 at scale of 100:
 
-        $ {NAME} -d 5:2,3:2,2:2 -s100 --vert 2 sam.json
+        $ {NAME} -d 5:2,3:2,2:2 -s100 --axes 2 sam.json
 """
+
+# Defaults
+#=========
+
+Config = lambda : {
+  "show_objects": [],
+  "hide_objects": [],
+  "camera": {"view": "iso"},
+  #                  {iso|plan|elev[ation]|sect[ion]}
+  "displacements": {"scale": 100, "color": "red"},
+  "origin":        {"color": "black"},
+  "elements": {
+      "frame" : {
+          "displaced": {"color": "red", "npoints": 20}
+      }
+  },
+  "nodes": {
+      "default": {"marker": "square", "color": "#000000"},
+      "displaced" : {},
+      "fixed"  : {},
+  }
+}
 
 # The following Tcl script can be used to create a results
 # file
@@ -93,6 +123,8 @@ NDM=3 # this script currently assumes ndm=3
 
 # The following functions are used for reshaping data
 # and carrying out other miscellaneous operations.
+
+class RenderError(Exception): pass
 
 def wireframe(sam:dict)->dict:
     """
@@ -186,8 +218,9 @@ def displaced_profile(
         displ: Array,  #: Displacements
         vect=None,         #: Element orientation vector
         glob:bool=True,    #: Transform to global coordinates
+        npoints:int = 10,
     )->Array:
-    n = 40
+    n = npoints
     #          (---ndm---)
     rep = 4 if len(coord[0])==3 else 2
     Q = rotation(coord, vect)
@@ -284,33 +317,100 @@ def plot_displ(frame:dict, res:dict, ax=None, axes=None):
             ax.plot(x,y,z, **props)
     return ax
 
-class PlotlyPlotter:
-    def __init__(self,axes):
+class Plotter:
+    def __init__(self,model, axes=None):
+        self.model = model
+        if axes is None: axes = [0,2,1]
         self.axes = axes
-    
+
+class GnuPlotter(Plotter):
+    def plot_frames(self):
+        print("""
+        splot "-" using 1:2:3 with lines
+        """)
+        coords = self._get_frames()
+        np.savetxt(sys.stdout, coords)
+
+    def _get_frames(self):
+        axes = self.axes
+        model = self.model
+        props = {"color": "#808080", "alpha": 0.6}
+        coords = np.zeros((len(model["elems"])*3,NDM))
+        coords.fill(np.nan)
+        for i,e in enumerate(model["elems"].values()):
+            coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+        return coords
+
+
+
+class PlotlyPlotter(Plotter): 
     def plot(x,y,**opts):
         pass
 
     def plot_frames():
         pass
 
-def plot_skeletal_plotly(model, axes=None):
-    if axes is None: axes = [0,2,1]
-    props = {"color": "#808080", "alpha": 0.6}
-    ax = new_3d_axis()
-    coords = np.zeros((len(model["elems"])*3,NDM))
-    coords.fill(np.nan)
-    for i,e in enumerate(model["elems"].values()):
-        coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
-    x,y,z = coords.T
-    return {"mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
+    def _get_displ(self,res:dict):
+        frame = self.model
+        axes = self.axes
+        props = {"color": "red"}
+        N = 10
+        coords = np.zeros((len(frame["elems"])*(N+1),NDM))
+        coords.fill(np.nan)
+        for i,el in enumerate(frame["elems"].values()):
+            # exclude zero-length elements
+            if "zero" not in el["type"].lower():
+                glob_displ = [
+                    u for n in el["nodes"] 
+                    #   extract displ from node, default to ndf zeros
+                        for u in res.get(n,[0.0]*frame["nodes"][n]["ndf"])
+                ]
+                vect = el["trsfm"]["vecInLocXZPlane"]
+                coords[(N+1)*i:(N+1)*i+N,:] = displaced_profile(el["crd"], glob_displ, vect=vect, npoints=N)[axes].T
+        x,y,z = coords.T
+        return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
+
+    def _get_nodes(self):
+        x,y,z = self.model["coord"].T[self.axes]
+        keys  = ["tag",]
+        nodes = np.array(list(self.model["nodes"].keys()))[:,None]
+        return {
+                "x": x, "y": y, "z": z, 
+                "type": "scatter3d","mode": "markers",
+                "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
+                "customdata": list(nodes),
+                "marker": {
+                    "symbol": "square",
+                    "color": "#000000",
+                    "size": 3,
+                    "line": {
+                        "color": "#000000",
+                        "width": 2
+                    }
+                }
+        }
+
+    def _get_frames(self):
+        axes = self.axes
+        model = self.model
+        props = {"color": "#808080", "alpha": 0.6}
+        coords = np.zeros((len(model["elems"])*3,NDM))
+        coords.fill(np.nan)
+        for i,e in enumerate(model["elems"].values()):
+            coords[3*i:3*i+2,:] = np.array(e["crd"])[:,axes]
+        x,y,z = coords.T
+        return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
     
 
-def plot_plotly(model, axes=None):
+def plot_plotly(model, axes=None, displ=None):
     import plotly.graph_objects as go
-    fig = go.Figure(
-            go.Scatter3d(**plot_skeletal_plotly(model,axes)),
-            go.Layout(
+    plt = PlotlyPlotter(model,axes)
+    frames = plt._get_frames()
+    nodes = plt._get_nodes()
+    fig = go.Figure(dict(
+            #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
+            data=[frames, nodes] + ([plt._get_displ(displ)] if displ else []),
+            layout=go.Layout(
                 scene=dict(aspectmode='data',
                      xaxis_visible=False,
                      yaxis_visible=False,
@@ -321,7 +421,7 @@ def plot_plotly(model, axes=None):
                 ),
                 showlegend=False
             )
-        )
+        ))
     return fig
 
 # Script functions
@@ -342,8 +442,9 @@ def parse_args(argv)->dict:
         "scale":      100.0,
         "axes" :      [0,2,1],
         "displ_only": False,
-        "plot_opts":  [],
-        "view":       "iso"
+        "plot_show":  [],
+        "view":       "iso",
+        "plotter":    "mpl"
     }
     args = iter(argv[1:])
     for arg in args:
@@ -352,11 +453,13 @@ def parse_args(argv)->dict:
                 print(HELP)
                 sys.exit()
 
+            elif arg == "--gnu":
+                opts["plotter"] = "gnu"
+
             elif arg == "--install":
-                try:
-                    install_me(next(args))
-                except StopIteration:
-                    install_me()
+                try: install_me(next(args))
+                # if no directory is provided, use default
+                except StopIteration: install_me()
                 sys.exit()
 
             elif arg[:2] == "-d":
@@ -371,13 +474,16 @@ def parse_args(argv)->dict:
             elif arg == "--scale":
                 opts["scale"] = float(next(args))
 
-            elif arg == "--vert":
+            elif arg == "--axes":
                 vert = int(next(args))
                 tran = 2 if vert == 1 else 1
                 opts["axes"][1:] = [tran, vert]
 
-            elif arg[:2] == "-p":
-                opts["plot_opts"].append(arg[2:] if len(arg) > 2 else next(args))
+            elif arg[:2] == "--show":
+                opts["plot_show"].append(arg[2:] if len(arg) > 2 else next(args))
+
+            elif arg[:2] == "--hide":
+                opts["plot_show"].pop(arg[2:] if len(arg) > 2 else next(args))
             
             elif arg[:2] == "-V":
                 opts["view"] = arg[2:] if len(arg) > 2 else next(args)
@@ -395,8 +501,7 @@ def parse_args(argv)->dict:
 
             # Final check on options
             elif arg[0] == "-":
-                print(f"ERROR - unknown option '{arg}'")
-                sys.exit()
+                raise RenderError(f"ERROR - unknown option '{arg}'")
 
             elif not opts["sam_file"]:
                 opts["sam_file"] = arg
@@ -406,9 +511,7 @@ def parse_args(argv)->dict:
 
         except StopIteration:
             # `next(args)` was called without successive arg
-            print(f"ERROR -- Argument '{arg}' expected value")
-            print(f"         Run '{NAME} --help' for more information")
-            sys.exit()
+            raise RenderError(f"ERROR -- Argument '{arg}' expected value")
     return opts
 
 def install_me(install_dir=None):
@@ -419,7 +522,7 @@ TESTS = [
     (False,"{NAME} sam.json -d 2:plan -s"),
     (True, "{NAME} sam.json -d 2:plan -s50"),
     (True, "{NAME} sam.json -d 2:3    -s50"),
-    (True, "{NAME} sam.json -d 5:2,3:2,2:2 -s100 --vert 2 sam.json")
+    (True, "{NAME} sam.json -d 5:2,3:2,2:2 -s100 --axes 2 sam.json")
 ]
 
 # Main script
@@ -431,10 +534,13 @@ def render(sam_file, res_file=None, **opts):
     axes = opts["axes"]
 
     if sam_file is None:
-        print("ERROR -- expected positional argument <sam-file>")
-        sys.exit()
+        raise RenderError("ERROR -- expected positional argument <sam-file>")
 
     model = read_model(sam_file)
+
+    if opts["plotter"] == "gnu":
+        GnuPlotter(model, axes).plot_frames()
+        sys.exit()
 
     if not opts["displ_only"]:
         ax = plot_skeletal(model,axes=axes)
@@ -468,12 +574,12 @@ def render(sam_file, res_file=None, **opts):
     # Handle plot formatting
     set_axis_limits(ax)
     ax.view_init(**VIEWS[opts["view"]])
-    if "origin" in opts["plot_opts"]: add_origin(ax, scale)
+    if "origin" in opts["plot_show"]: add_origin(ax, scale)
 
     if opts["write_file"]:
     # write plot to file if file name provided
         if "html" in opts["write_file"]:
-            fig = plot_plotly(model,axes)
+            fig = plot_plotly(model,axes,displ=res)
             import plotly
             plotly.offline.plot(fig,
                     filename=opts["write_file"],
@@ -488,62 +594,10 @@ def render(sam_file, res_file=None, **opts):
 
 if __name__ == "__main__":
 
-    opts = parse_args(sys.argv)
     try:
-        render(**opts)
-    except Exception as e:
+        render(**parse_args(sys.argv))
+    except (FileNotFoundError,RenderError) as e:
         print(e, file=sys.stderr)
-        print(f"         Run '{NAME} --help' for more information")
+        print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
         sys.exit()
-
-#    axes = opts["axes"]
-#
-#    if opts["sam_file"] is None:
-#        print("ERROR -- expected positional argument <sam-file>")
-#        sys.exit()
-#
-#    model = read_model(opts["sam_file"])
-#
-#    if not opts["displ_only"]:
-#        ax = plot_skeletal(model,axes=axes)
-#    else:
-#        ax = None
-#       
-#    if opts["res_file"] is not None:
-#        with open(opts["res_file"], "r") as f:
-#            res = yaml.load(f,Loader=yaml.Loader)[opts["mode"]]
-#    else:
-#        res = {}
-#    for n,d in opts["displ"]:
-#        v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
-#        if d < 3: # translational dof
-#            v[d] += 1.0
-#        else:
-#            v[d] += 0.1
-#
-#    # apply scale
-#    scale = opts["scale"]
-#    if scale != 1.0:
-#        for n in res.values():
-#            for i in range(len(n)):
-#                n[i] *= scale
-#
-#
-#    ax = plot_nodes(model, res, ax=ax, axes=axes)
-#    if res:
-#        plot_displ(model, res, axes=axes, ax=ax)
-#
-#    # Handle plot formatting
-#    set_axis_limits(ax)
-#    ax.view_init(**VIEWS[opts["view"]])
-#    if "origin" in opts["plot_opts"]: add_origin(ax, scale)
-#
-#    if opts["write_file"]:
-#    # write plot to file if file name provided
-#        ax.figure.savefig(opts["write_file"])
-#    else:
-#    # otherwise show in new window
-#        import matplotlib.pyplot as plt
-#        plt.show()
-
 
