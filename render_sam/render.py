@@ -325,11 +325,18 @@ class Plotter:
 
 class GnuPlotter(Plotter):
     def plot_frames(self):
+        file=sys.stdout
         print("""
+        set term wxt
+        unset border
+        unset xtics
+        unset ytics
+        unset ztics
+        set view equal xyz
         splot "-" using 1:2:3 with lines
-        """)
+        """,file=file)
         coords = self._get_frames()
-        np.savetxt(sys.stdout, coords)
+        np.savetxt(file, coords)
 
     def _get_frames(self):
         axes = self.axes
