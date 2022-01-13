@@ -1,3 +1,4 @@
+#!/bin/env python
 #!/bin/env -S ipython --
 
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
@@ -27,22 +28,23 @@ Generate a plot of a structural model.
 
 Positional Arguments:
 
-    SAM_FILE                     JSON file defining the structural model.
-    RES_FILE                     JSON or YAML file defining a structural
-                                 response.
+    <sam-file>                    JSON file defining the structural model.
+    <res-file>                    JSON or YAML file defining a structural
+                                  response.
 
 Options:
-    -s/--scale <scale>           Set displacement scale factor.
-    -d/--displ NODE:DOF...       Apply a unit displacement at node with tag NODE
-                                 in direction DOF.
+    -s, --scale <scale>           Set displacement scale factor.
+    -d, --displ <node>:<dof>...   Apply a unit displacement at node with tag <node>
+                                  in direction <dof>.
 
-    -V/--view  {{elev|plan|sect}}  Set camera view.
-    -p PLOT_OPT                  Specify plotting option.
-    --vert INT                   Specify vertical axis.
+    -V, --view  {{elev|plan|sect}}  Set camera view.
+    -p PLOT_OPT                   Specify plotting option.
+    --vert INT                    Specify vertical axis.
 
-    -o/--write FILE              Save plot to FILE.
-    -h/--help                    Print this message and exit.
-       --man
+    -o, --write FILE              Save plot to FILE.
+    -h, --help                    Print this message and exit.
+
+    -T, --tcl   {{sam|res}}
 
 Examples:
         $ {NAME} sam.json
@@ -53,18 +55,30 @@ Examples:
         $ {NAME} -d 5:2,3:2,2:2 -s100 --vert 2 sam.json
 """
 
+# The following Tcl script can be used to create a results
+# file
+RES_SCRIPT = """
+foreach m {$modes}
+"""
+
 # The following Python packages are required by this script:
 
 REQUIREMENTS = """
+pyyaml
 scipy
 numpy
 matplotlib
 """
 
 import sys
-import numpy as np
-from scipy.linalg import block_diag
-import matplotlib.pyplot as plt
+try:
+    import yaml
+    import numpy as np
+    Array = np.ndarray
+    from scipy.linalg import block_diag
+except:
+    yaml = None
+    Array = list
 NDM=3 # this script currently assumes ndm=3
 
 # Data shaping / Misc.
@@ -75,7 +89,8 @@ NDM=3 # this script currently assumes ndm=3
 
 def wireframe(sam:dict)->dict:
     """
-    return dict with the form:
+    Process OpenSees JSON output and return dict with the form:
+
         {<elem tag>: {"crd": [<coordinates>], ...}}
     """
     geom  = sam["geometry"]
@@ -101,7 +116,7 @@ def wireframe(sam:dict)->dict:
 elev_dofs = lambda u: u[[1,2]]
 plan_dofs = lambda u: u[[3,4]]
 
-def elastic_curve(x, v, L)->np.ndarray:
+def elastic_curve(x: Array, v: Array, L:float)->Array:
     "compute points along Euler's elastica"
     vi, vj = v
     xi = x/L                        # local coordinates
@@ -130,7 +145,7 @@ def linear_deformations(u,L):
     ])
 
 
-def rotation(xyz:np.ndarray, vert=(0,0,-1))->np.ndarray:
+def rotation(xyz: Array, vert=(0,0,-1))->Array:
     "Create a rotation matrix between local e and global E"
     dx = xyz[1] - xyz[0]
     L = np.linalg.norm(dx)
@@ -144,11 +159,11 @@ def rotation(xyz:np.ndarray, vert=(0,0,-1))->np.ndarray:
 
 
 def displaced_profile(
-        coord: np.ndarray,
-        displ:np.ndarray,  #: Displacements
+        coord: Array,
+        displ: Array,  #: Displacements
         vect=None,         #: Element orientation vector
         glob:bool=True,    #: Transform to global coordinates
-    )->np.ndarray:
+    )->Array:
     n = 40
     #          (---ndm---)
     rep = 4 if len(coord[0])==3 else 2
@@ -173,14 +188,15 @@ def displaced_profile(
 # Plotting
 #----------------------------------------------------
 
-VIEWS = {
+VIEWS = { # pre-defined plot views
     "plan":    dict(azim= 0, elev=90),
     "sect":    dict(azim= 0, elev= 0),
     "elev":    dict(azim=90, elev= 0),
-    "default": dict(azim=45, elev=35)
+    "iso":     dict(azim=45, elev=35)
 }
 
 def new_3d_axis():
+    import matplotlib.pyplot as plt
     _, ax = plt.subplots(1, 1, subplot_kw={"projection": "3d"})
     ax.set_autoscale_on(True)
     ax.set_axis_off()
@@ -225,7 +241,7 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     ax.scatter(x, y, z, **props)
     return ax
 
-def plot_displ(frame, res, ax=None, axes=None):
+def plot_displ(frame:dict, res:dict, ax=None, axes=None):
     props = {"color": "red"}
     ax = ax or new_3d_axis()
     if axes is None: axes = [0,2,1]
@@ -246,6 +262,9 @@ def plot_displ(frame, res, ax=None, axes=None):
 # Script functions
 #----------------------------------------------------
 
+# Argument parsing is implemented manually because in
+# the past I have found the standard library module
+# `argparse` to be slow.
 
 def parse_args(argv)->dict:
     # default options
@@ -259,16 +278,21 @@ def parse_args(argv)->dict:
         "axes" :      [0,2,1],
         "displ_only": False,
         "plot_opts":  [],
-        "view": "default"
+        "view":       "iso"
     }
     args = iter(argv[1:])
-    for arg in iter(args):
+    for arg in args:
         try:
             if arg == "--help" or arg == "-h":
-                print(HELP) is None and sys.exit()
+                print(HELP)
+                sys.exit()
 
             elif arg == "--install":
-                pass
+                try:
+                    install_me(next(args))
+                except StopIteration:
+                    install_me()
+                sys.exit()
 
             elif arg[:2] == "-d":
                 node_dof = arg[2:] if len(arg) > 2 else next(args)
@@ -291,6 +315,8 @@ def parse_args(argv)->dict:
             
             elif arg[:2] == "-V":
                 opts["view"] = arg[2:] if len(arg) > 2 else next(args)
+            elif arg == "--view":
+                opts["view"] = next(args)
 
             elif arg[:2] == "-m":
                 opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
@@ -301,21 +327,33 @@ def parse_args(argv)->dict:
             elif arg == "--displ-only":
                 opts["displ_only"] = True
 
+            # Final check on options
+            elif arg[0] == "-":
+                print(f"ERROR - unknown option '{arg}'")
+                sys.exit()
+
             elif not opts["sam_file"]:
                 opts["sam_file"] = arg
 
             else:
                 opts["res_file"] = arg
+
         except StopIteration:
+            # `next(args)` was called without successive arg
             print(f"ERROR -- Argument '{arg}' expected value")
     return opts
 
+def install_me(install_dir=None):
+    import subprocess
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+
 # Main script
 #----------------------------------------------------
+# The following code is only executed when the file
+# is invoked as a script.
 
 if __name__ == "__main__":
-    import json, yaml
-# az, el = 45, 35
+    import json
     opts = parse_args(sys.argv)
     axes = opts["axes"]
 
@@ -353,9 +391,11 @@ if __name__ == "__main__":
     ax.view_init(**VIEWS[opts["view"]])
     if "origin" in opts["plot_opts"]: add_origin(ax, scale)
 
-
     if opts["write_file"]:
+    # write plot to file if file name provided
         ax.figure.savefig(opts["write_file"])
     else:
+    # otherwise show in new window
+        import matplotlib.pyplot as plt
         plt.show()
 
