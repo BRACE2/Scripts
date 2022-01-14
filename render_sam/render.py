@@ -118,16 +118,22 @@ Config = lambda : {
   "view":         "iso",
   "plotter":      "mpl",
 
-  "camera": {"view": "iso"},
-  #                  {iso|plan|elev[ation]|sect[ion]}
+  "camera": {
+      "view": "iso",               # iso | plan| elev[ation] | sect[ion]
+      "projection": "orthographic" # perspective | orthographic
+  },
 
   "displacements": {"scale": 100, "color": "#660505"},
+
   "objects": {
+
       "origin": {"color": "black"},
+
       "frames" : {
           "color": "#000000",
           "displaced": {"color": "red", "npoints": 20}
       },
+
       "nodes": {
           "default": {"size": 2, "color": "#000000"},
           "displaced" : {},
@@ -458,6 +464,7 @@ class PlotlyPlotter(Plotter):
         keys  = ["tag",]
         nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
         return {
+                "name": "nodes",
                 "x": x, "y": y, "z": z, 
                 "type": "scatter3d","mode": "markers",
                 "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
@@ -465,15 +472,23 @@ class PlotlyPlotter(Plotter):
                 "marker": {
                     "symbol": "square",
                     **self.opts["objects"]["nodes"]["default"]
-                    #"line": {
-                    #    "color": "#000000",
-                    #    "width": 2
-                    #}
                 }
         }
 
-    def _get_frames_labels(self):
-        self._frame_coords[::3]
+    def _get_frame_labels(self):
+        coords = self._frame_coords.reshape(-1,4,3)[:,-3]
+        x,y,z = coords.T
+        keys  = ["tag",]
+        frames = np.array(list(self.model["elems"].keys()),dtype=FLOAT)[:,None]
+        return {
+                "name": "frames",
+                "x": x, "y": y, "z": z, 
+                "type": "scatter3d","mode": "markers",
+                "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
+                "customdata": frames,
+                "opacity": 0
+                #"marker": {"opacity": 0.0,"size": 0.0, "line": {"width": 0.0}}
+        }
 
     def _get_frames(self):
         N = 4
@@ -499,17 +514,18 @@ def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
     frames = plt._get_frames()
+    labels = plt._get_frame_labels()
     nodes = plt._get_nodes()
     fig = go.Figure(dict(
             #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
-            data=[frames, nodes] + ([plt._get_displ(displ)] if displ else []),
+            data=[frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
             layout=go.Layout(
                 scene=dict(aspectmode='data',
                      xaxis_visible=False,
                      yaxis_visible=False,
                      zaxis_visible=False,
                      camera=dict(
-                         projection={"type": "perspective"}
+                         projection={"type": opts["camera"]["projection"]}
                      )
                 ),
                 showlegend=False
