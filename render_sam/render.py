@@ -22,6 +22,7 @@
 NAME = "rndr.py"
 HELP = f"""
 usage: {NAME} <sam-file>
+       {NAME} --install
        {NAME} [options] <sam-file>
        {NAME} [options] <sam-file> <res-file>
 
@@ -37,16 +38,18 @@ Options:
     -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
                                    <node> in direction <dof>.
     -V, --view   {{elev|plan|sect}}  Set camera view.
-    -a, --axes   [<L><T>]<V>       Specify model axes.
+    -a, --axes   [<L><T>]<V>       Specify model axes. Only <V> is required
         --hide   <object>          Hide <object>; see '--show'.
         --show   <object>          Show <object>; accepts any of:
                                       {{origin|frames|frames.displ|nodes|nodes.displ}}
 
     -o, --save   <out-file>        Save plot to <out-file>.
     -c, --conf
+
+        --install                  Install script dependencies.
+        --script {{sam|res}}
     -h, --help                     Print this message and exit.
 
-        --script {{sam|res}}
 
 
     <dof>        {{long | tran | vert | sect | elev | plan}}
@@ -68,21 +71,39 @@ Examples:
 #=========
 
 Config = lambda : {
-  "show_objects": [],
-  "hide_objects": [],
+  "show_objects": ["frames", "frames.displ", "nodes"],
+  "hide_objects": ["origin"],
+  "sam_file":   None,
+  "res_file":   None,
+  "write_file": None,
+  "displ":      [],
+  "scale":      100.0,
+  "axes" :      [0,2,1],
+  "view":       "iso",
+  "plotter":    "mpl",
+
   "camera": {"view": "iso"},
   #                  {iso|plan|elev[ation]|sect[ion]}
-  "displacements": {"scale": 100, "color": "red"},
-  "origin":        {"color": "black"},
-  "elements": {
-      "frame" : {
+
+  "displacements": {"scale": 100, "color": "#660505"},
+  "objects": {
+      "origin": {"color": "black"},
+      "frames" : {
+          "color": "#000000",
           "displaced": {"color": "red", "npoints": 20}
-      }
+      },
+      "nodes": {
+          "default": {"size": 2, "color": "#000000"},
+          "displaced" : {},
+          "fixed"  : {},
+      },
   },
-  "nodes": {
-      "default": {"marker": "square", "color": "#000000"},
-      "displaced" : {},
-      "fixed"  : {},
+  "save_options": {
+      "html": {
+          "include_plotlyjs": True,
+          "include_mathjax" : "cdn",
+          "full_html"       : True
+      }
   }
 }
 
@@ -135,13 +156,13 @@ def wireframe(sam:dict)->dict:
         {<elem tag>: {"crd": [<coordinates>], ...}}
     """
     geom  = sam["geometry"]
-    coord = np.array([n["crd"] for n in geom["nodes"]],dtype=FLOAT)
-    nodes = {n["name"]: n for n in geom["nodes"]}
+    coord = np.array([n.pop("crd") for n in geom["nodes"]],dtype=FLOAT)
+    nodes = {n["name"]: {**n, "crd": coord[i]} for i,n in enumerate(geom["nodes"])}
     trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
     elems =  {
       e["name"]: dict(
         **e, 
-        crd=np.array([nodes[n]["crd"] for n in e["nodes"]],dtype=FLOAT),
+        crd=np.array([nodes[n]["crd"] for n in e["nodes"]], dtype=FLOAT),
         trsfm=trsfm[e["crdTransformation"]] if "crdTransformation" in e else None
       ) for e in geom["elements"]
     }
@@ -241,7 +262,6 @@ def displaced_profile(
 
     #dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
     dx,dy,dz = Q@np.linspace(displ[:3], displ[6:9], n).T
-    #local_curve = np.stack([xaxis+displ[0], plan_curve+dy, elev_curve+dz])
     local_curve = np.stack([xaxis+dx[0], plan_curve+dy, elev_curve+dz])
 
     if glob:
@@ -297,7 +317,7 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     Zero = np.zeros(NDM)
     props = {"color": "black",
              "marker": "s",
-             "s": 3,
+             "s": 2,
              "zorder": 2}
 
     coord = frame["coord"]
@@ -309,7 +329,7 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     return ax
 
 def plot_displ(frame:dict, res:dict, ax=None, axes=None):
-    props = {"color": "red"}
+    props = {"color": "#660505"}
     ax = ax or new_3d_axis()
     if axes is None: axes = [0,2,1]
     for el in frame["elems"].values():
@@ -326,10 +346,11 @@ def plot_displ(frame:dict, res:dict, ax=None, axes=None):
     return ax
 
 class Plotter:
-    def __init__(self,model, axes=None):
+    def __init__(self,model, opts, axes=None):
         self.model = model
         if axes is None: axes = [0,2,1]
         self.axes = axes
+        self.opts = opts
 
 class GnuPlotter(Plotter):
     def plot_frames(self):
@@ -396,12 +417,11 @@ class PlotlyPlotter(Plotter):
                 "customdata": list(nodes),
                 "marker": {
                     "symbol": "square",
-                    "color": "#000000",
-                    "size": 3,
-                    "line": {
-                        "color": "#000000",
-                        "width": 2
-                    }
+                    **self.opts["objects"]["nodes"]["default"]
+                    #"line": {
+                    #    "color": "#000000",
+                    #    "width": 2
+                    #}
                 }
         }
 
@@ -417,9 +437,9 @@ class PlotlyPlotter(Plotter):
         return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
     
 
-def plot_plotly(model, axes=None, displ=None):
+def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
-    plt = PlotlyPlotter(model,axes)
+    plt = PlotlyPlotter(model,axes=axes,opts=opts)
     frames = plt._get_frames()
     nodes = plt._get_nodes()
     fig = go.Figure(dict(
@@ -448,19 +468,20 @@ def plot_plotly(model, axes=None, displ=None):
 
 def parse_args(argv)->dict:
     # default options
-    opts = {
-        "mode":       1,
-        "sam_file":   None,
-        "res_file":   None,
-        "write_file": None,
-        "displ":      [],
-        "scale":      100.0,
-        "axes" :      [0,2,1],
-        "displ_only": False,
-        "plot_show":  [],
-        "view":       "iso",
-        "plotter":    "mpl"
-    }
+    #opts = {
+    #    "mode":       1,
+    #    "sam_file":   None,
+    #    "res_file":   None,
+    #    "write_file": None,
+    #    "displ":      [],
+    #    "scale":      100.0,
+    #    "axes" :      [0,2,1],
+    #    "displ_only": False,
+    #    "show_objects":  [],
+    #    "view":       "iso",
+    #    "plotter":    "mpl"
+    #}
+    opts = Config()
     args = iter(argv[1:])
     for arg in args:
         try:
@@ -494,25 +515,25 @@ def parse_args(argv)->dict:
                 tran = 2 if vert == 1 else 1
                 opts["axes"][1:] = [tran, vert]
 
-            elif arg[:2] == "--show":
-                opts["plot_show"].append(arg[2:] if len(arg) > 2 else next(args))
+            elif arg == "--show":
+                opts["show_objects"].extend(next(args).split(","))
 
-            elif arg[:2] == "--hide":
-                opts["plot_show"].pop(arg[2:] if len(arg) > 2 else next(args))
+            elif arg == "--hide":
+                opts["show_objects"].pop(next(args))
             
             elif arg[:2] == "-V":
                 opts["view"] = arg[2:] if len(arg) > 2 else next(args)
             elif arg == "--view":
                 opts["view"] = next(args)
 
-            elif arg[:2] == "-m":
-                opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
+            #elif arg[:2] == "-m":
+            #    opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
 
             elif arg[:2] == "-o":
                 opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
 
-            elif arg == "--displ-only":
-                opts["displ_only"] = True
+            #elif arg == "--displ-only":
+            #    opts["displ_only"] = True
 
             # Final check on options
             elif arg[0] == "-":
@@ -530,8 +551,27 @@ def parse_args(argv)->dict:
     return opts
 
 def install_me(install_dir=None):
+    import os
     import subprocess
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+    #subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+    try:
+        from setuptools import setup
+    except ImportError:
+        from distutils.core import setup
+
+    sys.argv = sys.argv[:1] + ["develop"]
+    print(sys.argv)
+
+    setup(name='render',
+          version='0.0.1',
+          description='',
+          long_description=HELP,
+          author='', author_email='', url='',
+          py_modules=['render'],
+          scripts=['render.py'],
+          license='',
+          install_requires=[],
+    )
 
 TESTS = [
     (False,"{NAME} sam.json -d 2:plan -s"),
@@ -557,14 +597,14 @@ def render(sam_file, res_file=None, **opts):
         GnuPlotter(model, axes).plot_frames()
         sys.exit()
 
-    if not opts["displ_only"]:
-        ax = plot_skeletal(model,axes=axes)
-    else:
-        ax = None
+    #for obj in opts["show_objects"]:
+    #    plt[obj]
+
+    ax = plot_skeletal(model,axes=axes)
        
     if res_file is not None:
         with open(res_file, "r") as f:
-            res = yaml.load(f,Loader=yaml.Loader)[opts["mode"]]
+            res = yaml.load(f,Loader=yaml.Loader)
     else:
         res = {}
     for n,d in opts["displ"]:
@@ -589,16 +629,17 @@ def render(sam_file, res_file=None, **opts):
     # Handle plot formatting
     set_axis_limits(ax)
     ax.view_init(**VIEWS[opts["view"]])
-    if "origin" in opts["plot_show"]: add_origin(ax, scale)
+    if "origin" in opts["show_objects"]: add_origin(ax, scale)
 
     if opts["write_file"]:
     # write plot to file if file name provided
         if "html" in opts["write_file"]:
-            fig = plot_plotly(model,axes,displ=res)
+            fig = plot_plotly(model,axes,displ=res,opts=opts)
             import plotly
-            plotly.offline.plot(fig,
-                    filename=opts["write_file"],
-                    auto_open=False)
+            print(str(id(model)),file=sys.stderr)
+            html = plotly.io.to_html(fig, div_id=str(id(model)), **opts["save_options"]["html"])
+            with open(opts["write_file"],"w+") as f:
+                f.write(html)
         else:
             ax.figure.savefig(opts["write_file"])
     else:
@@ -608,7 +649,6 @@ def render(sam_file, res_file=None, **opts):
     return ax
 
 if __name__ == "__main__":
-
     try:
         render(**parse_args(sys.argv))
     except (FileNotFoundError,RenderError) as e:
