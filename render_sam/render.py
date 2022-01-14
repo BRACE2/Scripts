@@ -1,5 +1,4 @@
 #!/bin/env python
-#!/bin/env -S ipython --
 
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
 # 
@@ -9,17 +8,44 @@
 # was developed by the NHERI SimCenter.
 #
 #
-# This script is broken into the following sections:
+# # Installation
 #
-# - Data shaping / Misc.
-# - Kinematics
-# - Plotting
-# - Script functions
-# - Main script
+# The simplest way to install this script is to run
+# 
+#     $ python render.py --install
+#
+# from a terminal that has python installed, in a
+# directory containing the `render.py` file. This
+# will install the following packages:
 
-# The script may be invoked from the command line as follows:
+REQUIREMENTS = """
+pyyaml
+scipy
+numpy
+matplotlib
+"""
 
-NAME = "rndr.py"
+# ## Matlab
+# In order to install the Matlab bindings, open Matlab in a
+# directory containing the files `render.py` and `render.m`,
+# and run the following command in the Matlab interpreter:
+#
+#     render --install
+#
+# Once this process is complete, the command `render` can be
+# called from Matlab, just as described below for the command
+# line.
+#
+# # Usage
+# This script can be used either as a module, or as a command
+# line utility. When invoked from the command line on
+# **Windows**, {NAME} should be `python -m render`. For example:
+#
+#     python -m render model.json --axes 2 --view elev
+#
+# The script may be invoked with the following options:
+
+NAME = "render.py"
 HELP = f"""
 usage: {NAME} <sam-file>
        {NAME} --install
@@ -59,6 +85,7 @@ Options:
 
 EXAMPLES="""
 Examples:
+    Plot the structural model defined in the file `sam.json`:
         $ {NAME} sam.json
 
     Plot displaced structure with unit translation at nodes
@@ -67,20 +94,29 @@ Examples:
         $ {NAME} -d 5:2,3:2,2:2 -s100 --axes 2 sam.json
 """
 
+# The remainder of this script is broken into the following sections:
+#
+# - Data shaping / Misc.
+# - Kinematics
+# - Plotting
+# - Command line processing
+#
+
 # Defaults
 #=========
+# The following configuration options are available:
 
 Config = lambda : {
   "show_objects": ["frames", "frames.displ", "nodes"],
   "hide_objects": ["origin"],
-  "sam_file":   None,
-  "res_file":   None,
-  "write_file": None,
-  "displ":      [],
-  "scale":      100.0,
-  "axes" :      [0,2,1],
-  "view":       "iso",
-  "plotter":    "mpl",
+  "sam_file":     None,
+  "res_file":     None,
+  "write_file":   None,
+  "displ":        [],
+  "scale":        100.0,
+  "orientation":  [0,2,1],
+  "view":         "iso",
+  "plotter":      "mpl",
 
   "camera": {"view": "iso"},
   #                  {iso|plan|elev[ation]|sect[ion]}
@@ -99,6 +135,7 @@ Config = lambda : {
       },
   },
   "save_options": {
+      # Options for when writing to an HTML file.
       "html": {
           "include_plotlyjs": True,
           "include_mathjax" : "cdn",
@@ -106,6 +143,15 @@ Config = lambda : {
       }
   }
 }
+
+def apply_config(conf, opts):
+    for k,v in conf.items():
+        print(k,v)
+        if isinstance(v,dict):
+            apply_conf(v, opts[k])
+        else:
+            opts[k] = v
+
 
 # The following Tcl script can be used to create a results
 # file
@@ -117,15 +163,6 @@ for {set m 1} {$m <= 3} {incr m} {
     puts "  $n: \[[join [nodeEigenvector $n $m] {, }]\]";
   }
 }
-"""
-
-# The following Python packages are required by this script:
-
-REQUIREMENTS = """
-pyyaml
-scipy
-numpy
-matplotlib
 """
 
 import sys
@@ -171,7 +208,11 @@ def wireframe(sam:dict)->dict:
 def read_model(filename:str)->dict:
     import json
     with open(filename,"r") as f:
-        return wireframe(json.load(f)["StructuralAnalysisModel"])
+        sam = json.load(f)
+    model = wireframe(sam["StructuralAnalysisModel"])
+    if "RendererConfiguration" in sam:
+        model["config"] = sam["RendererConfiguration"]
+    return model
 
 # Kinematics
 #----------------------------------------------------
@@ -404,7 +445,13 @@ class PlotlyPlotter(Plotter):
                 vect = el["trsfm"]["vecInLocXZPlane"]
                 coords[(N+1)*i:(N+1)*i+N,:] = displaced_profile(el["crd"], glob_displ, vect=vect, npoints=N)[axes].T
         x,y,z = coords.T
-        return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
+        return {
+            "type": "scatter3d", 
+            "mode": "lines", 
+            "x": x, "y": y, "z": z, 
+            "line": {"color":props["color"]}, 
+            "hoverinfo":"skip"
+        }
 
     def _get_nodes(self):
         x,y,z = self.model["coord"].T[self.axes]
@@ -425,16 +472,27 @@ class PlotlyPlotter(Plotter):
                 }
         }
 
+    def _get_frames_labels(self):
+        self._frame_coords[::3]
+
     def _get_frames(self):
+        N = 4
         axes = self.axes
         model = self.model
         props = {"color": "#808080", "alpha": 0.6}
-        coords = np.zeros((len(model["elems"])*3,NDM))
+        coords = np.zeros((len(model["elems"])*N,NDM))
         coords.fill(np.nan)
         for i,e in enumerate(model["elems"].values()):
-            coords[3*i:3*i+2,:] = e["crd"][:,axes]
+            coords[N*i:N*i+N-1,:] = np.linspace(*e["crd"][:,axes], N-1)
+        self._frame_coords = coords
         x,y,z = coords.T
-        return {"type": "scatter3d", "mode": "lines", "x": x, "y": y, "z": z, "line": {"color":props["color"]}}
+        return {
+            "type": "scatter3d", 
+            "mode": "lines", 
+            "x": x, "y": y, "z": z, 
+            "line": {"color":props["color"]}, 
+            "hoverinfo":"skip"
+        }
     
 
 def plot_plotly(model, axes=None, displ=None, opts={}):
@@ -467,20 +525,6 @@ def plot_plotly(model, axes=None, displ=None, opts={}):
 # `argparse` to be slow.
 
 def parse_args(argv)->dict:
-    # default options
-    #opts = {
-    #    "mode":       1,
-    #    "sam_file":   None,
-    #    "res_file":   None,
-    #    "write_file": None,
-    #    "displ":      [],
-    #    "scale":      100.0,
-    #    "axes" :      [0,2,1],
-    #    "displ_only": False,
-    #    "show_objects":  [],
-    #    "view":       "iso",
-    #    "plotter":    "mpl"
-    #}
     opts = Config()
     args = iter(argv[1:])
     for arg in args:
@@ -502,7 +546,7 @@ def parse_args(argv)->dict:
                 node_dof = arg[2:] if len(arg) > 2 else next(args)
                 for nd in node_dof.split(","):
                     node, dof = nd.split(":")
-                    opts["displ"].append((int(node), get_dof_num(dof, opts["axes"])))
+                    opts["displ"].append((int(node), get_dof_num(dof, opts["orientation"])))
 
             elif arg[:2] == "-s":
                 opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
@@ -513,7 +557,7 @@ def parse_args(argv)->dict:
             elif arg == "--axes":
                 vert = int(next(args))
                 tran = 2 if vert == 1 else 1
-                opts["axes"][1:] = [tran, vert]
+                opts["orientation"][1:] = [tran, vert]
 
             elif arg == "--show":
                 opts["show_objects"].extend(next(args).split(","))
@@ -550,10 +594,12 @@ def parse_args(argv)->dict:
             raise RenderError(f"ERROR -- Argument '{arg}' expected value")
     return opts
 
-def install_me(install_dir=None):
+def install_me(install_opt=None):
     import os
     import subprocess
-    #subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+    if install_opt == "dependencies":
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+        sys.exit()
     try:
         from setuptools import setup
     except ImportError:
@@ -586,12 +632,16 @@ TESTS = [
 # is invoked as a script.
 
 def render(sam_file, res_file=None, **opts):
-    axes = opts["axes"]
 
     if sam_file is None:
         raise RenderError("ERROR -- expected positional argument <sam-file>")
 
     model = read_model(sam_file)
+
+    if "config" in model:
+        apply_config(model["config"], opts)
+    
+    axes = opts["orientation"]
 
     if opts["plotter"] == "gnu":
         GnuPlotter(model, axes).plot_frames()
