@@ -559,7 +559,7 @@ def install_me(install_dir=None):
     except ImportError:
         from distutils.core import setup
 
-    sys.argv = sys.argv[:1] + ["develop"]
+    sys.argv = sys.argv[:1] + ["develop", "--user"]
     print(sys.argv)
 
     setup(name='render',
@@ -570,7 +570,7 @@ def install_me(install_dir=None):
           py_modules=['render'],
           scripts=['render.py'],
           license='',
-          install_requires=[],
+          install_requires=[*REQUIREMENTS.strip().split("\n")],
     )
 
 TESTS = [
