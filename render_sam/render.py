@@ -172,7 +172,7 @@ for {set m 1} {$m <= 3} {incr m} {
 }
 """
 
-import sys
+import sys, os
 try:
     import yaml
     import numpy as np
@@ -543,6 +543,12 @@ def plot_plotly(model, axes=None, displ=None, opts={}):
 
 def parse_args(argv)->dict:
     opts = Config()
+    if os.path.exists(".render.yaml"):
+        with open(".render.yaml", "r") as f:
+            presets = yaml.load(f, Loader=yaml.Loader)
+
+        apply_config(presets,opts)
+
     args = iter(argv[1:])
     for arg in args:
         try:
@@ -670,8 +676,13 @@ def render(sam_file, res_file=None, **opts):
     ax = plot_skeletal(model,axes=axes)
        
     if res_file is not None:
-        with open(res_file, "r") as f:
+        from urllib.parse import urlparse
+        res_path = urlparse(res_file)
+        with open(res_path[2], "r") as f:
             res = yaml.load(f,Loader=yaml.Loader)
+        if res_path[4]: # query parameters passed
+            res = res[int(res_path[4].split("=")[-1])]
+
     else:
         res = {}
     for n,d in opts["displ"]:
@@ -716,8 +727,9 @@ def render(sam_file, res_file=None, **opts):
     return ax
 
 if __name__ == "__main__":
+    opts = parse_args(sys.argv)
     try:
-        render(**parse_args(sys.argv))
+        render(**opts)
     except (FileNotFoundError,RenderError) as e:
         print(e, file=sys.stderr)
         print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
