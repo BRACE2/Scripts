@@ -8,6 +8,7 @@ per=per';
 gama=1/2;
 beta=1/4;
 
+
 numper=size(per,1);
 m=1;
 numdata=size(accfr,1);
