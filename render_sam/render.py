@@ -22,6 +22,7 @@ REQUIREMENTS = """
 pyyaml
 scipy
 numpy
+plotly
 matplotlib
 """
 
