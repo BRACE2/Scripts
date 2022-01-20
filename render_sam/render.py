@@ -56,32 +56,32 @@ usage: {NAME} <sam-file>
 Generate a plot of a structural model.
 
 Positional Arguments:
-    <sam-file>                     JSON file defining the structural model.
-    <res-file>                     JSON or YAML file defining a structural
+  <sam-file>                     JSON file defining the structural model.
+  <res-file>                     JSON or YAML file defining a structural
                                    response.
 
 Options:
-    -s, --scale  <scale>           Set displacement scale factor.
-    -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
-                                   <node> in direction <dof>.
-    -V, --view   {{elev|plan|sect}}  Set camera view.
-    -a, --axes   [<L><T>]<V>       Specify model axes. Only <V> is required
-        --hide   <object>          Hide <object>; see '--show'.
-        --show   <object>          Show <object>; accepts any of:
-                                      {{origin|frames|frames.displ|nodes|nodes.displ}}
+  -s, --scale  <scale>           Set displacement scale factor.
+  -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
+                                 <node> in direction <dof>.
+  -V, --view   {{elev|plan|sect}}  Set camera view.
+  -a, --axes   [<L><T>]<V>       Specify model axes. Only <V> is required
+      --hide   <object>          Hide <object>; see '--show'.
+      --show   <object>          Show <object>; accepts any of:
+                                    {{origin|frames|frames.displ|nodes|nodes.displ}}
 
-    -o, --save   <out-file>        Save plot to <out-file>.
-    -c, --conf
+  -o, --save   <out-file>        Save plot to <out-file>.
+  -c, --conf
 
-        --install                  Install script dependencies.
-        --script {{sam|res}}
-    -h, --help                     Print this message and exit.
+      --install                  Install script dependencies.
+      --script {{sam|res}}
+  -h, --help                     Print this message and exit.
 
 
 
-    <dof>        {{long | tran | vert | sect | elev | plan}}
-                 {{  0  |   1  |   2  |   3  |   4  |   5 }}
-    <object>     {{origin|frames|frames.displ|nodes|nodes.displ}}
+  <dof>        {{long | tran | vert | sect | elev | plan}}
+               {{  0  |   1  |   2  |   3  |   4  |   5 }}
+  <object>     {{origin|frames|frames.displ|nodes|nodes.displ}}
 """
 
 EXAMPLES="""
