@@ -1,6 +1,6 @@
 close all;
 clear all;
-% clc;
+clc;
 
 % System Identification of Rio Dell Bridge. It consists of three main parts.
 % 1st part is based on the Transfer Function Estimate (TFE) and identifies the
@@ -22,8 +22,8 @@ g = 981;                                           %acceleration of gravity in c
 inputname = input('Do you want to input folder name [Y/N]:', 's');
 if isempty(inputname) || inputname == 'N' || inputname == 'n'
     inputname = 'N';
-    FolderName='RioDell_Petrolia_Processed_Data';    %Name of folder with processed CSMIP data files for main EQ
-   %FolderName='RioDell_Petrolia_AS'  %Name of folder with processed CSMIP data files for aftershock
+    FolderName = 'RioDell_Petrolia_Processed_Data';    %Name of folder with processed CSMIP data files for main EQ
+   %FolderName = 'RioDell_Petrolia_AS'  %Name of folder with processed CSMIP data files for aftershock
 else
     FolderName = input('Folder name is:', 's');
 end
@@ -32,6 +32,8 @@ FolderName
 
 Minperiod = 0.18;                                  %Min period range to specify peak amplitude
 Maxperiod = 0.90;                                  %Max period range to specify peak amplitude
+
+
 
 % In terms of input and output channels, five cases can be considered:
 
@@ -59,7 +61,7 @@ casenumber = input('Which case # (I/O): 1 (T/T), 2 (L/L), 3 (L/V), 4 (L/L+V), or
 if isempty(casenumber)
     casenumber = '1';
 end
-Case = strcat('Case',casenumber)
+Case = strcat('Case',casenumber);
 
 tic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,15 +98,15 @@ end
 %%
 % File names of input and output channels
 if InpChan<10
-    inpfilename = strcat(FolderName,'/','CHAN00',num2str(InpChan),'.v2');
+    inpfilename = strcat(FolderName,'/','CHAN00',num2str(InpChan),'.V2');
 else
-    inpfilename = strcat(FolderName,'/','CHAN0',num2str(InpChan),'.v2');
+    inpfilename = strcat(FolderName,'/','CHAN0',num2str(InpChan),'.V2');
 end
 
 if OutChan<10
-    outfilename = strcat(FolderName,'/','CHAN00',num2str(OutChan),'.v2');
+    outfilename = strcat(FolderName,'/','CHAN00',num2str(OutChan),'.V2');
 else
-    outfilename = strcat(FolderName,'/','CHAN0',num2str(OutChan),'.v2');
+    outfilename = strcat(FolderName,'/','CHAN0',num2str(OutChan),'.V2');
 end
 
 %%
@@ -123,7 +125,7 @@ if jj == 2
 end
 
 % readv2 is a function that reads accelerometer data & time step from CSMIP format.
-% This format is same for historical data & real-time data for the Hayward Bridge.  
+% This format is same for historical data & real-time data for the Hayward Bridge. 
 [acc dt] = readv2(filename);
 acc_amp = max(acc(:));
 
@@ -135,7 +137,7 @@ hold on;
 xlabel('Time [Sec]');
 ylabel('A [g]');
 xlim ([0.0 (length(acc)-1)*dt]);
-str = {'Time history of',strcat('Channel =',num2str(Channel))};
+str = {'Time history of',strcat('Channel  = ',num2str(Channel))};
 text(0.5,acc_amp/g*.75,str)
  
 % compute the response spectrum [requires specifying damping ratio] & Fourier Amplitude (FA) 
@@ -156,7 +158,7 @@ if jj == 1
     hold on;
     xlabel('Period [Sec]');
     ylabel('Sa [g]');
-    str = {'Response spectrum of the input channel',strcat('Channel =',num2str(InpChan)),strcat('Damping ratio (%) =',num2str(dmp*100))};
+    str = {'Response spectrum of the input channel',strcat('Channel  = ',num2str(InpChan)),strcat('Damping ratio (%)  = ',num2str(dmp*100))};
     text(0.4,max(SA1)/g*0.85,str)
 
 elseif jj == 2
@@ -168,7 +170,7 @@ elseif jj == 2
     hold on;
     xlabel('Period [Sec]');
     ylabel('Sa [g]');
-    str = {'Response spectrum of the output channel',strcat('Channel =',num2str(OutChan)),strcat('Damping ratio (%) =',num2str(dmp*100))};
+    str = {'Response spectrum of the output channel',strcat('Channel  = ',num2str(OutChan)),strcat('Damping ratio (%)  = ',num2str(dmp*100))};
     text(0.4,max(SA2)/g*0.85,str)
     
     % Compute and plot the transfer function
@@ -211,7 +213,7 @@ cond = 1;
 i = ind1;
 while cond == 1
     i = i+1;
-    if TT(i)<Amp1
+    if TT(i) < Amp1
         slope = (TT(i)-TT(i-1))/(per(i)-per(i-1));
 % T2 is the period to the right of Tn
         T2 = (Amp1-TT(i-1))/slope+per(i-1);
@@ -277,14 +279,14 @@ fn = 1/Period2;
 
 dmpratio2 = (f1-f2)/(2*fn)*100;
 
-% Add text to the transfer function figure listing the identified period & damoing ratio
-str = {strcat('Output Channel # =',num2str(OutChan)),strcat('Input Channel # =',num2str(InpChan))};
+% Add text to the transfer function figure listing the identified period & damping ratio
+str = {strcat('Output Channel #  = ',num2str(OutChan)),strcat('Input Channel #  = ',num2str(InpChan))};
 text(0.5,Ampap*0.95,str)
 
-str = {'Based on Absolute Peak',strcat('Period (sec) =',num2str(Period)),strcat('Damping ratio (%) =',num2str(dmpratio))};
+str = {'Based on Absolute Peak',strcat('Period (sec)  = ',num2str(Period)),strcat('Damping ratio (%)  = ',num2str(dmpratio))};
 text(0.5,Ampap*0.75,str)
 
-str = {'Based on User Specified Range',strcat('Period (sec) =',num2str(Period2)),strcat('Damping ratio (%) =',num2str(dmpratio2))};
+str = {'Based on User Specified Range',strcat('Period (sec)  = ',num2str(Period2)),strcat('Damping ratio (%)  = ',num2str(dmpratio2))};
 text(0.5,Ampap*0.55,str)
 
 % Plot the transfer function based on FFT
@@ -353,32 +355,29 @@ tic
          %Input channels: 1; Output channels: 11, 10, 8, 6
 %Case 5: Input in vertical direction, output in vertical direction
          %Input channels: 2; Output channel: 10, 8, 6
-         
-if Case == 'Case1'
+
+switch Case
+case 'Case1'
     anac = [17 3 20 9 7 4]; %Channel #s, 1st 3 are input channels & 2nd 3 are output channels
     inpchns = 1:3;          %Specify the indices of input channels
     outchns = 4:6;          %Specify the indices of output channels
-end
 
-if Case == 'Case2'
+case 'Case2'
     anac = [1 11];
     inpchns = 1;            %Specify the indices of input channels
     outchns = 2;            %Specify the indices of output channels
-end
 
-if Case == 'Case3'
+case 'Case3'
     anac = [1 10 8 6];
     inpchns = 1;            %Specify the indices of input channels
     outchns = 2:4;          %Specify the indices of output channels
-end
 
-if Case == 'Case4'
+case 'Case4'
     anac = [1 11 10 8 6];
     inpchns = 1;            %Specify the indices of input channels
     outchns = 2:5;          %Specify the indices of output channels
-end
 
-if Case == 'Case5'
+case 'Case5'
     anac = [2 10 8 6];
     inpchns = 1;            %Specify the indices of input channels
     outchns = 2:4;          %Specify the indices of output channels
@@ -596,7 +595,7 @@ end
 
 % b) Determination of damping ratios (Eqs. 3.46 & 3.39) 
 
-damp1=-(real(sj1))./(2*pi*freq1);
+damp1 = -(real(sj1))./(2*pi*freq1);
 
 % Represent the identified frequency & damping information of the proper roots in a matrix
 koun = 1;
@@ -768,7 +767,6 @@ for lih = 1:kss(1)
   else
       validationm=' not valid';
   end
-  scroutput = strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmp(lih,6)),', MPC= ',num2str(freqdmp(lih,7)), ' -->',' OKID-ERA-DC Identified Mode ',num2str(lih), ' is',validationm);
   sprintf(scroutput)  
 end
 
@@ -823,31 +821,8 @@ tic
 % Lines between these can be commented. But for now they are uncommented for testing
 %%KKKKK
 %%%
-
-%% Inputs
-
-% In terms of input and output channels, five cases can be considered as
-% described below.
-
-%Case 1: Input in transverse direction, output in transverse direction
-         %Input channels: 17, 3, 20; Output channels: 9, 7, 4  
-%Case 2: Input in longitudinal direction, output in longitudinal direction
-         %Input channels: 1; Output channel: 11
-%Case 3: Input in longitudinal direction, output in vertical direction
-         %Considering that the bridge is similar to a frame in the longitudinal direction, 
-         %shaking along this direction results in long. translational accelerations as well
-         %as bending & rotation of the deck, causing vertical accelerations on deck nodes.
-         %Case 3 makes use of this behavior to identify the long. mode. The influence vector
-         %of long. ground motions on vertical accelerations is zero, which is a concern,
-         %but this is still a useful case. 
          %Input channels: 1; Output channels: 10, 8, 6
 %Case 4: Input in longitudinal direction, output in longitudinal & vertical directions.
-         %This is a case that can only be applied to OKID-ERA-DC and SRIM. Therefore, it is the same
-         %as Case 3 in TFE, and similar to Case 3 in OKID-ERA-DC and SRIM, except that the output
-         %channels is a combination of longitudinal & vertical channels.
-         %Input channels: 1; Output channels: 11, 10, 8, 6
-%Case 5: Input in vertical direction, output in vertical direction
-         %Input channels: 2; Output channel: 10, 8, 6
          
 % Note that the input and output channels are common to OKID-ERA-DC and SRIM.
 % They are already input as the OKID-ERA-DC inputs.
@@ -916,7 +891,7 @@ Ruu = upS*upS'/nsizS;
 Ruy = upS*ypS'/nsizS;
 
 %Compute the correlation matrix (Eq. 3.69)
-Rhh = Ryy-Ruy'*(Ruu^-1)*Ruy;
+Rhh = Ryy-Ruy'*(Ruu\Ruy);
 
 %% 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
 
@@ -938,13 +913,13 @@ Op2 = un2(:,1:n1);
 
 % Determine the system matrices A & C (1 & 2 indicate the ones corresponding
 % to full & partial decomposition, respectively. 2 is commented out) 
-A1 = pinv(Op1(1:(p-1)*m,:))*Op1(m+1:p*m,:);
+A1 = lsqminnorm(Op1(1:(p-1)*m,:), Op1(m+1:p*m,:));
 %%KKKKK
-A2 = pinv(Op2(1:(p-1)*m,:))*Op2(m+1:p*m,:);
+%A2 = lsqminnorm(Op2(1:(p-1)*m,:), Op2(m+1:p*m,:));
 %%KKKKK
 C1 = Op1(1:m,:);
 %%KKKKK
-C2 = Op2(1:m,:);
+%C2 = Op2(1:m,:);
 %%KKKKK
 
 %% Note: A2 & C2 not used herein 
@@ -956,39 +931,63 @@ C2 = Op2(1:m,:);
 % Output Error Minimization
 % Setting up the fi matrix
 %%KKKKK
-fi = zeros(m*nsizS,n1+m*r+n1*r);
-% 
-% First block column of fi
-for df = 1:nsizS
-    fi((df-1)*m+1:df*m,1:n1) = C1*A1^(df-1);
+fi = zeros(m*nsizS, n1+m*r+n1*r);
+A_p = A1;
+CA_powers = zeros(m, size(A1,2), 1+nsizS);
+CA_powers(:,:,1) = C1*A_p;
+for pwr = 1:nsizS
+  A_p = A1*A_p;
+  CA_powers(:,:,pwr+1) =  C1*A_p;
 end
-% 
+
+%
+% First block column of fi
+fi(1:m,1:n1) = C1;
+for df = 2:nsizS
+    fi((df-1)*m+1:df*m,1:n1) = CA_powers(:,:,df-1);
+end
+%
 % Second block column of fi
+Imm = speye(m,m);
 for df = 1:nsizS
-    um = zeros(m,m*r);
-    um = kron(dati(df,:),eye(m,m));
-    fi((df-1)*m+1:df*m,n1+1:n1+m*r) = um;
+    fi((df-1)*m+1:df*m,n1+1:n1+m*r) = kron(dati(df,:),Imm);
 end
 % 
 % Third block column of fi
-for df = 2:nsizS
-    summ = zeros(m,n1*r);
-    for nmf = 1:df-1
-        summ = C1*A1^(df-nmf-1)*kron(dati(nmf,:),eye(n1,n1))+summ;
-    end
-    fi((df-1)*m+1:df*m,n1+m*r+1:n1+m*r+n1*r) = summ;
+In1n1 = speye(n1,n1);
+c = n1+m*r+1;
+d = n1+m*r+n1*r;
+fi3 = zeros(m, d-c+1, nsizS-1);
+
+parfor df = 2:nsizS
+    a = (df-1)*m+1;
+    b = df*m;
+    fi3(:,:,df) = block_3(df, m, CA_powers, dati, n1, r, C1);
+    %for nmf = 1:df-1
+    %    %fi(a:b,c:d) = fi(a:b,c:d) + CA_powers(:,:,df-nmf)*kron(dati(nmf,:),In1n1);
+    %    fi((df-1)*m+1:df*m, n1+m*r+1 : n1+m*r+n1*r) = fi((df-1)*m+1:df*m, n1+m*r+1 : n1+m*r+n1*r) + CA_powers(:,:,df-nmf)*kron(dati(nmf,:),In1n1);
+    %end
+    %fi(a:b,c:d) = cumsum(CA_powers(:,:,df-nmf)*kron(dati(:,:), In1n1))
 end
+for df = 2:nsizS
+    a = (df-1)*m+1;
+    b = df*m;
+    fi(a:b,c:d) = fi3(:, :, df);
+end
+
 % 
 dattemp = dato(1:nsizS,:)';
 y = dattemp(:);
 % 
-teta = pinv(fi)*y;
+teta = lsqminnorm(fi,y);
+
 x0 = teta(1:n1);
 dcol = teta(n1+1:n1+m*r);
 bcol = teta(n1+m*r+1:n1+m*r+n1*r);
 % 
 n = n1;
-D = zeros(m,r);B = zeros(n,r);
+D = zeros(m,r);
+B = zeros(n,r);
 % Obtain D
 for wq = 1:r
     D(:,wq) = dcol((wq-1)*m+1:wq*m);
@@ -1021,7 +1020,7 @@ if freq1S(n,1) == freq1S(n-1,1)
 end
 
 for hw = 2:n-1
-   if freq1S(hw,1) == freq1S(hw+1,1) | freq1S(hw,1) == freq1S(hw-1,1);
+   if freq1S(hw,1) == freq1S(hw+1,1) || freq1S(hw,1) == freq1S(hw-1,1)
       freq1S(hw,2) = 1;
    end
 end
@@ -1044,7 +1043,7 @@ end
 % c) Determination of mode shapes
 mod = C1*vS;                  %mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
 %%KKKKK
-inm = v^-1*B;                 %initial modal contribution
+inm = v\B;                 %initial modal contribution
 %%KKKKK
    
 kss = size(freqdmpSRIM,1);
@@ -1055,7 +1054,7 @@ for q = 1:kss
 end
 
 for q = 1:kss
-   [mit om] = max(abs(real(modeshapeSRIM(:,q))));
+   [mit, om] = max(abs(real(modeshapeSRIM(:,q))));
    modeshapeSRIM(:,q) = real(modeshapeSRIM(:,q))*1/mit*sign(real(modeshapeSRIM(om,q)));
 end
 
@@ -1075,9 +1074,11 @@ modeplot(modeshapeSRIM,freqdmpSRIM,Case);
 
 % a) Modal Phase Collinearity (MPC) [Eqs. 3.85-3.87]
 for q = 1:n
-   sxx(:,q) = real(mod(:,q))'*real(mod(:,q));
-   syy(:,q) = imag(mod(:,q))'*imag(mod(:,q));
-   sxy(:,q) = real(mod(:,q))'*imag(mod(:,q));
+   a = real(mod(:,q));
+   b = imag(mod(:,q));
+   sxx(:,q) = a'*a;
+   syy(:,q) = b'*b;
+   sxy(:,q) = a'*b;
    nu(q) = (syy(:,q)-sxx(:,q))/(2*sxy(:,q));
    lam(1,q) = (sxx(:,q)+syy(:,q))/2+sxy(:,q)*(nu(q)^2+1)^0.5;
    lam(2,q) = (sxx(:,q)+syy(:,q))/2-sxy(:,q)*(nu(q)^2+1)^0.5;
@@ -1092,20 +1093,20 @@ end
 
 %%KKKKK
 plin = Op1*vS;     % Observability Matrix used for the output-EMAC
-lamb = vS^-1*A1*vS;
-bkh = vS^-1*B;
+lamb = vS\A1*vS;
+bkh = vS\B;
 % Pick the last block row
 pto = plin((p-1)*m+1:m*p,:); % the identified value at T0
 for ds = 1:n
     ptop(:,ds) = mod(:,ds)*exp(sj1S(ds)*to*(p-1));
- end
+end
 % Computation of rij
 for qa = 1:n
     for qz = 1:m
         Rij(qa,qz) = min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
         Pij = angle(pto(qz,qa)/ptop(qz,qa));
         Pijn(qa,qz) = Pij;
-        if abs(Pij)<=pi/4
+        if abs(Pij) <= pi/4
            Wij(qa,qz) = 1-abs(Pij)/(pi/4);
         else
            Wij(qa,qz) = 0;
@@ -1130,11 +1131,11 @@ for lih = 1:kss(1)
   freqdmpSRIM(lih,5) = emacof(freqdmpSRIM(lih,3));
   freqdmpSRIM(lih,6) = mpc(freqdmpSRIM(lih,3));
   if freqdmpSRIM(lih,5)>0.5 && freqdmpSRIM(lih,6)>0.5
-      validationm=' valid';
+      validationm = ' valid';
   else
-      validationm=' not valid';
+      validationm = ' not valid';
   end
-  scroutput = strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmpSRIM(lih,5)),', MPC= ',num2str(freqdmpSRIM(lih,6)), ' -->',' SRIM Identified Mode ',num2str(lih), ' is',validationm);
+  scroutput = strcat('Mode',num2str(lih), ': Output EMAC =  ',num2str(freqdmpSRIM(lih,5)),', MPC =  ',num2str(freqdmpSRIM(lih,6)), ' -->',' SRIM Identified Mode ',num2str(lih), ' is',validationm);
   sprintf(scroutput) 
 end
 
@@ -1155,11 +1156,18 @@ for i = 1:m
     temsum = sum((dato(:,i)-simy(:,i)).^2);
     Jm(i) = temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
 end
-RMSEpredSRIM = sum(Jm)/m;
-sprintf('Prediction Error Average for SRIM %0.4g', RMSEpredSRIM)
-%%KKKKK
 
+RMSEpredSRIM = sum(Jm)/m;
+sprintf('Prediction Error Average for SRIM %0.4g',RMSEpredSRIM)
+%%KKKKK
+toc
+function fi = block_3(df, m, CA_powers, dati, n1, r, C1)
+    In1n1 = speye(n1,n1);
+    fi = C1*kron(dati(df-1,:),In1n1);
+    for nmf = 1:df-2
+        fi = fi + CA_powers(:,:,df-nmf-1)*kron(dati(nmf,:),In1n1);
+    end
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% END of PART 3: : System Realization by Information Matrix (SRIM)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-toc
