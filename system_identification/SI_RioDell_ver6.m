@@ -160,8 +160,8 @@ if jj == 1
     text(0.4,max(SA1)/g*0.85,str)
 
 elseif jj == 2
-    SA2=SA;
-    FFA2=FFA;
+    SA2 = SA;
+    FFA2 = FFA;
     % Plot the response spectrum of the output channel
     figure;
     plot(per,SA2/g);
@@ -241,11 +241,11 @@ hold off;
 indmin = find(per == Minperiod);
 indmax = find(per == Maxperiod);
 Amp = max(TT(indmin:indmax));
-ind1=find(TT == Amp);
-Period2=per(ind1);
+ind1 = find(TT == Amp);
+Period2 = per(ind1);
 
 % compute the damping ratio using the Half-power bandwidth method 
-Amp1=Amp/sqrt(2);
+Amp1 = Amp/sqrt(2);
 
 cond = 1;
 i = ind1;
@@ -575,7 +575,7 @@ cnd = condeig(A);      %condeig(A): gives a vector of condition numbers for the 
 kit = log(diag(d));    %logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
-sj1=kit./to;              %to is the time step
+sj1 = kit./to;              %to is the time step
 freq1 = ((sj1.*conj(sj1)).^0.5)/(2*pi);
 
 % selection of proper roots
@@ -776,8 +776,8 @@ end
 %%     check against actual output accelerations
 
 % Prediction using state space model
-ms1=modstruc(A,B,C,D,zeros(n,m));
-th1=ms2th(ms1,'d');
+ms1 = modstruc(A,B,C,D,zeros(n,m));
+th1 = ms2th(ms1,'d');
 
 [e,r] = resid([dato dati],th1);
 [simy] = idsim([dati],th1);                % simy represents the estimated accelerations
@@ -854,7 +854,7 @@ tic
 
 % Modelparameters
 p = 5;         %# steps used for the identification. Referred to as the prediction horizon in literature
-n1=orm;      %Order of the model. # of computed and plotted modes depend on orm.
+n1 = orm;      %Order of the model. # of computed and plotted modes depend on orm.
              %For orm = 2, one mode is found, for orm = 4, two modes are found.
              %For case 1, one mode is transverse & the other is torsion.
              %For all other cases, the second mode is a higher mode.
@@ -926,25 +926,25 @@ Rhh = Ryy-Ruy'*(Ruu^-1)*Ruy;
 
 % Full Decomposition Method
 [un1,s1,uo1] = svd(Rhh,0);               % Eq. 3.74
-Op1=un1(:,1:n1);                       % Eq. 3.72
+Op1 = un1(:,1:n1);                       % Eq. 3.72
 
 % Partial Decomposition Method
 %%KKKKK
 [un2,s2,uo2] = svd(Rhh(:,1:(p-1)*m),0);
-Op2=un2(:,1:n1);
+Op2 = un2(:,1:n1);
 %%KKKKK
 
 %% 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
 
 % Determine the system matrices A & C (1 & 2 indicate the ones corresponding
 % to full & partial decomposition, respectively. 2 is commented out) 
-A1=pinv(Op1(1:(p-1)*m,:))*Op1(m+1:p*m,:);
+A1 = pinv(Op1(1:(p-1)*m,:))*Op1(m+1:p*m,:);
 %%KKKKK
-A2=pinv(Op2(1:(p-1)*m,:))*Op2(m+1:p*m,:);
+A2 = pinv(Op2(1:(p-1)*m,:))*Op2(m+1:p*m,:);
 %%KKKKK
-C1=Op1(1:m,:);
+C1 = Op1(1:m,:);
 %%KKKKK
-C2=Op2(1:m,:);
+C2 = Op2(1:m,:);
 %%KKKKK
 
 %% Note: A2 & C2 not used herein 
@@ -983,7 +983,7 @@ dattemp = dato(1:nsizS,:)';
 y = dattemp(:);
 % 
 teta = pinv(fi)*y;
-x0=teta(1:n1);
+x0 = teta(1:n1);
 dcol = teta(n1+1:n1+m*r);
 bcol = teta(n1+m*r+1:n1+m*r+n1*r);
 % 
