@@ -420,7 +420,7 @@ for r=1:nc
    end
    % read the acceleration and time step using the function readv2
    [a to] = readv2(fname);
-   dat(:,r)=a;
+   dat(:,r) = a;
 end
 
 d = size(dat,1); % total number of time steps
@@ -485,9 +485,9 @@ p = mro;             %assign input model reduction order to variable p, consiste
 % Compute matrix U that represents ARX equation of current output on p time steps of past output
 % & input values (Eq. 3.76)
 U = zeros((m+r)*p+r,l);
-U(1:r,:)=dati';
+U(1:r,:) = dati';
 for b=2:p+1
-   U((b-2)*(r+m)+1+r:(b-2)*(r+m)+r+r+m,b:l)=[dati(1:l-b+1,1:r)';dato(1:l-b+1,1:m)'];
+   U((b-2)*(r+m)+1+r:(b-2)*(r+m)+r+r+m,b:l) = [dati(1:l-b+1,1:r)';dato(1:l-b+1,1:m)'];
 end
 
 % i) Compute the matrix of Observer Markov Parameter Matrix (M) in Eq 3.76 using Linear Regression
@@ -510,7 +510,7 @@ ypreo = M*U;
 
 for i=1:m
    temsump = sum((dato(:,i)-ypreo(i,:)').^2);
-   Jpre(i)=temsump/(sum(dato(:,i).^2));
+   Jpre(i) = temsump/(sum(dato(:,i).^2));
 end
 
 Markovparamerror = sum(Jpre)/m;  % RMSE between actual output & y on left hand side in Eq. 3.76
@@ -548,8 +548,8 @@ end
 % Obtain Hankel Matrix of Zeroth Order & First Order
 for hj=1:kmax
     for jh=1:l
-        H0((hj-1)*m+1:hj*m,(jh-1)*r+1:jh*r)=Y{jh+hj};
-        H1((hj-1)*m+1:hj*m,(jh-1)*r+1:jh*r)=Y{jh+hj+1};
+        H0((hj-1)*m+1:hj*m,(jh-1)*r+1:jh*r) = Y{jh+hj};
+        H1((hj-1)*m+1:hj*m,(jh-1)*r+1:jh*r) = Y{jh+hj+1};
     end
 end
 
@@ -581,16 +581,16 @@ freq1=((sj1.*conj(sj1)).^0.5)/(2*pi);
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if freq1(1,1) == freq1(2,1)
-   freq1(1,2)=1;
+   freq1(1,2) = 1;
 end
 
 if freq1(n,1) == freq1(n-1,1)
-   freq1(n,2)=1;
+   freq1(n,2) = 1;
 end
 
 for hw=2:n-1
    if freq1(hw,1) == freq1(hw+1,1) | freq1(hw,1) == freq1(hw-1,1);
-      freq1(hw,2)=1;
+      freq1(hw,2) = 1;
    end
 end
 
@@ -602,10 +602,10 @@ damp1=-(real(sj1))./(2*pi*freq1);
 koun=1;
 for lk=1:2:n                        % from 1 to the model order, n
    if freq1(lk,2) == 1                % 1 indicates that it is a proper root
-       freqdmp(koun,1)=freq1(lk);   % first column: identified frequency 
-       freqdmp(koun,2)=damp1(lk);   % second column: identified damping ratio
-       freqdmp(koun,3)=lk;          % third column: model order index (1:n)
-       freqdmp(koun,4)=cnd(lk);     % condition number of the eigenvalue
+       freqdmp(koun,1) = freq1(lk);   % first column: identified frequency 
+       freqdmp(koun,2) = damp1(lk);   % second column: identified damping ratio
+       freqdmp(koun,3) = lk;          % third column: model order index (1:n)
+       freqdmp(koun,4) = cnd(lk);     % condition number of the eigenvalue
        koun = koun+1;
    end
 end
@@ -618,12 +618,12 @@ kss = size(freqdmp,1);
 
 %extract mode shapes from mod corresponding to a frequency
 for q=1:kss
-   modeshape(1:m,q)=mod(1:m,freqdmp(q,3)); 
+   modeshape(1:m,q) = mod(1:m,freqdmp(q,3)); 
 end
 
 for q=1:kss
    [mit om] = max(abs(real(modeshape(:,q))));
-   modeshape(:,q)=real(modeshape(:,q))*1/mit*sign(real(modeshape(om,q)));
+   modeshape(:,q) = real(modeshape(:,q))*1/mit*sign(real(modeshape(om,q)));
 end
 
 % Plot the mode shape together with frequency & damping ratio information
@@ -643,13 +643,13 @@ modeplot(modeshape,freqdmp,Case);
 
 % a) Modal Phase Collinearity (MPC) [Eqs. 3.85-3.87]
 for q=1:n
-   sxx(:,q)=real(mod(:,q))'*real(mod(:,q));
-   syy(:,q)=imag(mod(:,q))'*imag(mod(:,q));
-   sxy(:,q)=real(mod(:,q))'*imag(mod(:,q));
-   nu(q)=(syy(:,q)-sxx(:,q))/(2*sxy(:,q));
-   lam(1,q)=(sxx(:,q)+syy(:,q))/2+sxy(:,q)*(nu(q)^2+1)^0.5;
-   lam(2,q)=(sxx(:,q)+syy(:,q))/2-sxy(:,q)*(nu(q)^2+1)^0.5;
-   mpc(q)=((lam(1,q)-lam(2,q))/(lam(1,q)+lam(2,q)))^2;
+   sxx(:,q) = real(mod(:,q))'*real(mod(:,q));
+   syy(:,q) = imag(mod(:,q))'*imag(mod(:,q));
+   sxy(:,q) = real(mod(:,q))'*imag(mod(:,q));
+   nu(q) = (syy(:,q)-sxx(:,q))/(2*sxy(:,q));
+   lam(1,q) = (sxx(:,q)+syy(:,q))/2+sxy(:,q)*(nu(q)^2+1)^0.5;
+   lam(2,q) = (sxx(:,q)+syy(:,q))/2-sxy(:,q)*(nu(q)^2+1)^0.5;
+   mpc(q) = ((lam(1,q)-lam(2,q))/(lam(1,q)+lam(2,q)))^2;
 end
 
 % b) Extended Modal Amplitude Coherence (EMAC)
@@ -661,35 +661,35 @@ lamb = v^-1*A*v;
 bkh = v^-1*B;
 for hn=1:n
    for ll=0:l-1
-      qhat(hn,ll*r+1:ll*r+r)=bkh(hn,:)*(lamb(hn,hn))^ll;
+      qhat(hn,ll*r+1:ll*r+r) = bkh(hn,:)*(lamb(hn,hn))^ll;
    end
 end
 selsiz = min(size(qlin),size(qhat));
 
 for hnd=1:n
    ql = qlin(hnd,1:selsiz(2));qh = qhat(hnd,1:selsiz(2));
-   mac(hnd)=abs(ql*qh')/(abs(ql*ql')*abs(qh*qh'))^0.5;
+   mac(hnd) = abs(ql*qh')/(abs(ql*ql')*abs(qh*qh'))^0.5;
 end
 
 % Output EMAC (Eqs. 3.88-3.89)
 % Pick the last block row
 pto = plin((kmax-1)*m+1:m*kmax,:); % the identified value at T0
 for ds=1:n
-   ptop(:,ds)=mod(:,ds)*exp(sj1(ds)*to*(kmax-1));
+   ptop(:,ds) = mod(:,ds)*exp(sj1(ds)*to*(kmax-1));
 end
 
 % Computation of rij
 for qa=1:n
     for qz=1:m
-        Rij(qa,qz)=min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
+        Rij(qa,qz) = min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
         Pij = angle(pto(qz,qa)/ptop(qz,qa));
-        Pijn(qa,qz)=Pij;
+        Pijn(qa,qz) = Pij;
         if abs(Pij)<=pi/4
-            Wij(qa,qz)=1-abs(Pij)/(pi/4);
+            Wij(qa,qz) = 1-abs(Pij)/(pi/4);
         else
-            Wij(qa,qz)=0;
+            Wij(qa,qz) = 0;
         end
-        emaco(qa,qz)=Rij(qa,qz)*Wij(qa,qz);      % emaco is the ouput emac
+        emaco(qa,qz) = Rij(qa,qz)*Wij(qa,qz);      % emaco is the ouput emac
     end
 end
 
@@ -705,14 +705,14 @@ for er=1:l
 		% Computation of rik
         for qak=1:n
             for qzk=1:r
-                Rik(qak,qzk)=min((abs(qtovar(qak,qzk))/abs(qtopvar(qak,qzk))),(abs(qtopvar(qak,qzk))/abs(qtovar(qak,qzk))));
+                Rik(qak,qzk) = min((abs(qtovar(qak,qzk))/abs(qtopvar(qak,qzk))),(abs(qtopvar(qak,qzk))/abs(qtovar(qak,qzk))));
                 Pik = angle(qtovar(qak,qzk)/qtopvar(qak,qzk));
                 if abs(Pik)<=pi/4
-                    Wik(qak,qzk)=1-abs(Pik)/(pi/4);
+                    Wik(qak,qzk) = 1-abs(Pik)/(pi/4);
                 else
-                    Wik(qak,qzk)=0;
+                    Wik(qak,qzk) = 0;
                 end
-                emaci(qak,qzk)=Rik(qak,qzk)*Wik(qak,qzk);
+                emaci(qak,qzk) = Rik(qak,qzk)*Wik(qak,qzk);
             end
         end
       %Weight for emaci     
@@ -722,22 +722,22 @@ for er=1:l
          for lw=1:r
              sumi = emaci(xc,lw)*(inm(xc,lw)*inm(xc,lw)')+sumi;
          end
-      	emacif(xc)=sumi/(inm(xc,:)*inm(xc,:)');
+      	emacif(xc) = sumi/(inm(xc,:)*inm(xc,:)');
       end
-   	emacivar(:,er)=emacif;
+   	emacivar(:,er) = emacif;
 end
 
 % Computation of rik
 for qak=1:n
    for qzk=1:r
-      Rik(qak,qzk)=min((abs(qto(qak,qzk))/abs(qtop(qak,qzk))),(abs(qtop(qak,qzk))/abs(qto(qak,qzk))));
+      Rik(qak,qzk) = min((abs(qto(qak,qzk))/abs(qtop(qak,qzk))),(abs(qtop(qak,qzk))/abs(qto(qak,qzk))));
       Pik = angle(qto(qak,qzk)/qtop(qak,qzk));
       if abs(Pik)<=pi/4
-      	Wik(qak,qzk)=1-abs(Pik)/(pi/4);
+      	Wik(qak,qzk) = 1-abs(Pik)/(pi/4);
    	else
-         Wik(qak,qzk)=0;
+         Wik(qak,qzk) = 0;
       end
-        emaci(qak,qzk)=Rik(qak,qzk)*Wik(qak,qzk);
+        emaci(qak,qzk) = Rik(qak,qzk)*Wik(qak,qzk);
    end
 end
 
@@ -753,16 +753,16 @@ for xc=1:n
    for lw=1:r
       sumi = emaci(xc,lw)*abs(inm(xc,lw))^2+sumi;
    end
-   emacof(xc)=sumo/((mod(:,xc)'*mod(:,xc)));           %emacof is the final output EMAC          
-   emacif(xc)=sumi/(inm(xc,:)*inm(xc,:)');             %emacif is the final input EMAC
-   emac(xc)=emacof(xc)*emacif(xc);
+   emacof(xc) = sumo/((mod(:,xc)'*mod(:,xc)));           %emacof is the final output EMAC          
+   emacif(xc) = sumi/(inm(xc,:)*inm(xc,:)');             %emacif is the final input EMAC
+   emac(xc) = emacof(xc)*emacif(xc);
 end
   
 % Add the input EMAC, output EMAC, and MPC to the matrix freqdamp
 for lih=1:kss(1)
-  freqdmp(lih,5)=emacif(freqdmp(lih,3));
-  freqdmp(lih,6)=emacof(freqdmp(lih,3));
-  freqdmp(lih,7)=mpc(freqdmp(lih,3));
+  freqdmp(lih,5) = emacif(freqdmp(lih,3));
+  freqdmp(lih,6) = emacof(freqdmp(lih,3));
+  freqdmp(lih,7) = mpc(freqdmp(lih,3));
   if freqdmp(lih,6)>0.5 && freqdmp(lih,7)>0.5
       validationm=' valid';
   else
@@ -784,7 +784,7 @@ th1=ms2th(ms1,'d');
 
 for i=1:m
    temsum = sum((dato(:,i)-simy(:,i)).^2);
-   Jm(i)=temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
+   Jm(i) = temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
 end
 RMSEpred = sum(Jm)/m;
 sprintf('Prediction Error Average for OKID-ERA-DC %0.4g',RMSEpred)
@@ -904,8 +904,8 @@ upS = zeros(r*p,nsizS);
                           
 % Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)                          
 for b=1:p
-   ypS((b-1)*m+1:b*m,1:nsizS)=dato((b-1)+1:nsizS+(b-1),:)';
-   upS((b-1)*r+1:b*r,1:nsizS)=dati((b-1)+1:nsizS+(b-1),:)';
+   ypS((b-1)*m+1:b*m,1:nsizS) = dato((b-1)+1:nsizS+(b-1),:)';
+   upS((b-1)*r+1:b*r,1:nsizS) = dati((b-1)+1:nsizS+(b-1),:)';
 end
 
 %% 2b. Compute the correlation terms and the coefficient matrix (Eqs. 3.68 & 3.69).
@@ -960,14 +960,14 @@ fi = zeros(m*nsizS,n1+m*r+n1*r);
 % 
 % First block column of fi
 for df=1:nsizS
-    fi((df-1)*m+1:df*m,1:n1)=C1*A1^(df-1);
+    fi((df-1)*m+1:df*m,1:n1) = C1*A1^(df-1);
 end
 % 
 % Second block column of fi
 for df=1:nsizS
     um = zeros(m,m*r);
     um = kron(dati(df,:),eye(m,m));
-    fi((df-1)*m+1:df*m,n1+1:n1+m*r)=um;
+    fi((df-1)*m+1:df*m,n1+1:n1+m*r) = um;
 end
 % 
 % Third block column of fi
@@ -976,7 +976,7 @@ for df=2:nsizS
     for nmf=1:df-1
         summ = C1*A1^(df-nmf-1)*kron(dati(nmf,:),eye(n1,n1))+summ;
     end
-    fi((df-1)*m+1:df*m,n1+m*r+1:n1+m*r+n1*r)=summ;
+    fi((df-1)*m+1:df*m,n1+m*r+1:n1+m*r+n1*r) = summ;
 end
 % 
 dattemp = dato(1:nsizS,:)';
@@ -991,11 +991,11 @@ n = n1;
 D = zeros(m,r);B = zeros(n,r);
 % Obtain D
 for wq=1:r
-    D(:,wq)=dcol((wq-1)*m+1:wq*m);
+    D(:,wq) = dcol((wq-1)*m+1:wq*m);
 end
 % 
 for ww=1:r
-    B(:,ww)=bcol((ww-1)*n+1:ww*n);
+    B(:,ww) = bcol((ww-1)*n+1:ww*n);
 end
 %%KKKKK
 
@@ -1013,16 +1013,16 @@ freq1S=((sj1S.*conj(sj1S)).^0.5)/(2*pi);
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if freq1S(1,1) == freq1S(2,1)
-   freq1S(1,2)=1;
+   freq1S(1,2) = 1;
 end
 
 if freq1S(n,1) == freq1S(n-1,1)
-   freq1S(n,2)=1;
+   freq1S(n,2) = 1;
 end
 
 for hw=2:n-1
    if freq1S(hw,1) == freq1S(hw+1,1) | freq1S(hw,1) == freq1S(hw-1,1);
-      freq1S(hw,2)=1;
+      freq1S(hw,2) = 1;
    end
 end
 
@@ -1030,13 +1030,13 @@ end
 damp1S=-(real(sj1S))./(2*pi*freq1S);
 
 % Represent the identified frequency & damping information of the proper roots in a matrix
-koun=1;
-for lk=1:2:n                             % from 1 to the model order, n
+koun = 1;
+for lk = 1:2:n                             % from 1 to the model order, n
    if freq1S(lk,2) == 1                    % 1 indicates that it is a proper root
-       freqdmpSRIM(koun,1)=freq1S(lk);   % first column: identified frequency 
-       freqdmpSRIM(koun,2)=damp1S(lk);   % second column: identified damping ratio
-       freqdmpSRIM(koun,3)=lk;           % third column: model order index (1:n)
-       freqdmpSRIM(koun,4)=cndS(lk);     % condition number of the eigenvalue
+       freqdmpSRIM(koun,1) = freq1S(lk);   % first column: identified frequency 
+       freqdmpSRIM(koun,2) = damp1S(lk);   % second column: identified damping ratio
+       freqdmpSRIM(koun,3) = lk;           % third column: model order index (1:n)
+       freqdmpSRIM(koun,4) = cndS(lk);     % condition number of the eigenvalue
        koun = koun+1;
    end
 end
@@ -1051,12 +1051,12 @@ kss = size(freqdmpSRIM,1);
 
 %extract mode shapes from mod corresponding to a frequency
 for q=1:kss
-   modeshapeSRIM(1:m,q)=mod(1:m,freqdmpSRIM(q,3)); 
+   modeshapeSRIM(1:m,q) = mod(1:m,freqdmpSRIM(q,3)); 
 end
 
 for q=1:kss
    [mit om] = max(abs(real(modeshapeSRIM(:,q))));
-   modeshapeSRIM(:,q)=real(modeshapeSRIM(:,q))*1/mit*sign(real(modeshapeSRIM(om,q)));
+   modeshapeSRIM(:,q) = real(modeshapeSRIM(:,q))*1/mit*sign(real(modeshapeSRIM(om,q)));
 end
 
 % Plot the mode shape together with frequency & damping ratio information
@@ -1075,13 +1075,13 @@ modeplot(modeshapeSRIM,freqdmpSRIM,Case);
 
 % a) Modal Phase Collinearity (MPC) [Eqs. 3.85-3.87]
 for q=1:n
-   sxx(:,q)=real(mod(:,q))'*real(mod(:,q));
-   syy(:,q)=imag(mod(:,q))'*imag(mod(:,q));
-   sxy(:,q)=real(mod(:,q))'*imag(mod(:,q));
-   nu(q)=(syy(:,q)-sxx(:,q))/(2*sxy(:,q));
-   lam(1,q)=(sxx(:,q)+syy(:,q))/2+sxy(:,q)*(nu(q)^2+1)^0.5;
-   lam(2,q)=(sxx(:,q)+syy(:,q))/2-sxy(:,q)*(nu(q)^2+1)^0.5;
-   mpc(q)=((lam(1,q)-lam(2,q))/(lam(1,q)+lam(2,q)))^2;
+   sxx(:,q) = real(mod(:,q))'*real(mod(:,q));
+   syy(:,q) = imag(mod(:,q))'*imag(mod(:,q));
+   sxy(:,q) = real(mod(:,q))'*imag(mod(:,q));
+   nu(q) = (syy(:,q)-sxx(:,q))/(2*sxy(:,q));
+   lam(1,q) = (sxx(:,q)+syy(:,q))/2+sxy(:,q)*(nu(q)^2+1)^0.5;
+   lam(2,q) = (sxx(:,q)+syy(:,q))/2-sxy(:,q)*(nu(q)^2+1)^0.5;
+   mpc(q) = ((lam(1,q)-lam(2,q))/(lam(1,q)+lam(2,q)))^2;
 end
 
 % b) Extended Modal Amplitude Coherence (EMAC)
@@ -1097,20 +1097,20 @@ bkh = vS^-1*B;
 % Pick the last block row
 pto = plin((p-1)*m+1:m*p,:); % the identified value at T0
 for ds=1:n
-    ptop(:,ds)=mod(:,ds)*exp(sj1S(ds)*to*(p-1));
+    ptop(:,ds) = mod(:,ds)*exp(sj1S(ds)*to*(p-1));
  end
 % Computation of rij
 for qa=1:n
     for qz=1:m
-        Rij(qa,qz)=min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
+        Rij(qa,qz) = min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
         Pij = angle(pto(qz,qa)/ptop(qz,qa));
-        Pijn(qa,qz)=Pij;
+        Pijn(qa,qz) = Pij;
         if abs(Pij)<=pi/4
-           Wij(qa,qz)=1-abs(Pij)/(pi/4);
+           Wij(qa,qz) = 1-abs(Pij)/(pi/4);
         else
-           Wij(qa,qz)=0;
+           Wij(qa,qz) = 0;
         end
-        emaco(qa,qz)=Rij(qa,qz)*Wij(qa,qz);
+        emaco(qa,qz) = Rij(qa,qz)*Wij(qa,qz);
     end
 end
 % Computation of final emac
@@ -1120,15 +1120,15 @@ for xc=1:n
     for la=1:m  
         sumo = emaco(xc,la)*abs(mod(la,xc))^2+sumo;   
     end
-    emacof(xc)=sumo/((mod(:,xc)'*mod(:,xc)));
-    emac(xc)=emaco(xc);
+    emacof(xc) = sumo/((mod(:,xc)'*mod(:,xc)));
+    emac(xc) = emaco(xc);
 end
 %%KKKKK
 
 % Add the MPC to the matrix freqdampSRIM
 for lih=1:kss(1)
-  freqdmpSRIM(lih,5)=emacof(freqdmpSRIM(lih,3));
-  freqdmpSRIM(lih,6)=mpc(freqdmpSRIM(lih,3));
+  freqdmpSRIM(lih,5) = emacof(freqdmpSRIM(lih,3));
+  freqdmpSRIM(lih,6) = mpc(freqdmpSRIM(lih,3));
   if freqdmpSRIM(lih,5)>0.5 && freqdmpSRIM(lih,6)>0.5
       validationm=' valid';
   else
@@ -1153,7 +1153,7 @@ th1=ms2th(ms1,'d');
 % 
 for i=1:m
     temsum = sum((dato(:,i)-simy(:,i)).^2);
-    Jm(i)=temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
+    Jm(i) = temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
 end
 RMSEpredSRIM = sum(Jm)/m;
 sprintf('Prediction Error Average for SRIM %0.4g', RMSEpredSRIM)
