@@ -1,6 +1,6 @@
 close all;
 clear all;
-clc;
+% clc;
 
 % System Identification of Rio Dell Bridge. It consists of three main parts.
 % 1st part is based on the Transfer Function Estimate (TFE) and identifies the
@@ -19,19 +19,19 @@ clc;
 g=981;                                           %acceleration of gravity in cm/sec^2
 %% Inputs
 
-inputname=input('Do you want to input folder name [Y/N]:', 's');
+inputname = input('Do you want to input folder name [Y/N]:', 's');
 if isempty(inputname) || inputname=='N' || inputname=='n'
     inputname = 'N';
-    FolderName='RioDell_Petrolia';    %Name of folder with processed CSMIP data files for main EQ
+    FolderName='RioDell_Petrolia_Processed_Data';    %Name of folder with processed CSMIP data files for main EQ
    %FolderName='RioDell_Petrolia_AS'  %Name of folder with processed CSMIP data files for aftershock
 else
-    FolderName=input('Folder name is:', 's');
+    FolderName = input('Folder name is:', 's');
 end
 
 FolderName
 
-Minperiod=0.18;                                  %Min period range to specify peak amplitude
-Maxperiod=0.90;                                  %Max period range to specify peak amplitude
+Minperiod = 0.18;                                  %Min period range to specify peak amplitude
+Maxperiod = 0.90;                                  %Max period range to specify peak amplitude
 
 % In terms of input and output channels, five cases can be considered:
 
@@ -55,11 +55,11 @@ Maxperiod=0.90;                                  %Max period range to specify pe
 %Case 5: Input in vertical direction, output in vertical direction
          %Input channels: 2; Output channel: 6
 
-casenumber=input('Which case # (I/O): 1 (T/T), 2 (L/L), 3 (L/V), 4 (L/L+V), or 5 (V/V)? [1]:', 's');
+casenumber = input('Which case # (I/O): 1 (T/T), 2 (L/L), 3 (L/V), 4 (L/L+V), or 5 (V/V)? [1]:', 's');
 if isempty(casenumber)
     casenumber = '1';
 end
-Case=strcat('Case',casenumber)
+Case = strcat('Case',casenumber)
 
 tic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -96,15 +96,15 @@ end
 %%
 % File names of input and output channels
 if InpChan<10
-    inpfilename=strcat(FolderName,'/','CHAN00',num2str(InpChan),'.v2');
+    inpfilename = strcat(FolderName,'/','CHAN00',num2str(InpChan),'.v2');
 else
-    inpfilename=strcat(FolderName,'/','CHAN0',num2str(InpChan),'.v2');
+    inpfilename = strcat(FolderName,'/','CHAN0',num2str(InpChan),'.v2');
 end
 
 if OutChan<10
-    outfilename=strcat(FolderName,'/','CHAN00',num2str(OutChan),'.v2');
+    outfilename = strcat(FolderName,'/','CHAN00',num2str(OutChan),'.v2');
 else
-    outfilename=strcat(FolderName,'/','CHAN0',num2str(OutChan),'.v2');
+    outfilename = strcat(FolderName,'/','CHAN0',num2str(OutChan),'.v2');
 end
 
 %%
@@ -113,19 +113,19 @@ for jj=1:2
 % jj=1 corresponds to the input channel
 % jj=2 corresponds to the output channel
 if jj==1
-    filename=inpfilename;
-    Channel=InpChan;
+    filename = inpfilename;
+    Channel = InpChan;
 end
 
 if jj==2
-    filename=outfilename;
-    Channel=OutChan;
+    filename = outfilename;
+    Channel = OutChan;
 end
 
 % readv2 is a function that reads accelerometer data & time step from CSMIP format.
 % This format is same for historical data & real-time data for the Hayward Bridge.  
-[acc dt]=readv2(filename);
-acc_amp=max(acc(:));
+[acc dt] = readv2(filename);
+acc_amp = max(acc(:));
 
 % plot the accelerations in input & output channels
 figure;
@@ -173,7 +173,7 @@ elseif jj==2
     
     % Compute and plot the transfer function
     figure;
-    TT=SA2./SA1;
+    TT = SA2./SA1;
     plot(per,TT);
     hold on;
     xlabel('Period [Sec]');
@@ -188,17 +188,17 @@ end
 %% Compute the period and damping ratio based on the absolute peak
 
 % compute the period as the value that corresponds to the peak of the spectrum
-Ampap=max(TT);
+Ampap = max(TT);
 ind1=find(TT==Ampap);
-Period=per(ind1);
+Period = per(ind1);
 
 % compute the damping ratio using the Half-power bandwidth method 
 Amp1=Ampap/sqrt(2);
 
 cond=1;
-i=ind1;
+i = ind1;
 while cond==1
-    i=i-1;
+    i = i-1;
     if TT(i)<Amp1
         slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
 % T1 is the period to the left of Tn
@@ -208,9 +208,9 @@ while cond==1
 end
 
 cond=1;
-i=ind1;
+i = ind1;
 while cond==1
-    i=i+1;
+    i = i+1;
     if TT(i)<Amp1
         slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
 % T2 is the period to the right of Tn
@@ -238,9 +238,9 @@ hold off;
 % and the range can be chosen as wide as the entire range.
 
 % Compute the period as the value that corresponds to the peak of the spectrum
-indmin=find(per==Minperiod);
-indmax=find(per==Maxperiod);
-Amp=max(TT(indmin:indmax));
+indmin = find(per==Minperiod);
+indmax = find(per==Maxperiod);
+Amp = max(TT(indmin:indmax));
 ind1=find(TT==Amp);
 Period2=per(ind1);
 
@@ -248,9 +248,9 @@ Period2=per(ind1);
 Amp1=Amp/sqrt(2);
 
 cond=1;
-i=ind1;
+i = ind1;
 while cond==1
-    i=i-1;
+    i = i-1;
     if TT(i)<Amp1
         slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
 % T1 is the period to the left of Tn
@@ -260,9 +260,9 @@ while cond==1
 end
 
 cond=1;
-i=ind1;
+i = ind1;
 while cond==1
-    i=i+1;
+    i = i+1;
     if TT(i)<Amp1
         slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
 % T2 is the period to the right of Tn
@@ -290,7 +290,7 @@ text(0.5,Ampap*0.55,str)
 % Plot the transfer function based on FFT
 figure;
 Tf=1./ff1;
-TF=FFA2./FFA1;
+TF = FFA2./FFA1;
 plot(Tf,TF);
 hold on;
 xlabel('Period [sec]');
@@ -355,31 +355,31 @@ tic
          %Input channels: 2; Output channel: 10, 8, 6
          
 if Case=='Case1'
-    anac=[17 3 20 9 7 4]; %Channel #s, 1st 3 are input channels & 2nd 3 are output channels
+    anac = [17 3 20 9 7 4]; %Channel #s, 1st 3 are input channels & 2nd 3 are output channels
     inpchns=1:3;          %Specify the indices of input channels
     outchns=4:6;          %Specify the indices of output channels
 end
 
 if Case=='Case2'
-    anac=[1 11];
+    anac = [1 11];
     inpchns=1;            %Specify the indices of input channels
     outchns=2;            %Specify the indices of output channels
 end
 
 if Case=='Case3'
-    anac=[1 10 8 6];
+    anac = [1 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:4;          %Specify the indices of output channels
 end
 
 if Case=='Case4'
-    anac=[1 11 10 8 6];
+    anac = [1 11 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:5;          %Specify the indices of output channels
 end
 
 if Case=='Case5'
-    anac=[2 10 8 6];
+    anac = [2 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:4;          %Specify the indices of output channels
 end
@@ -410,25 +410,25 @@ kmax=100;  %Number of computed Markov parameters, indicated as 1000 on page 43 o
 %     computation of Markov parameters
 %% Read the acceleration from all the input and output channels
 
-nc=length(anac);                                 % number of channels
+nc = length(anac);                                 % number of channels
 
 for r=1:nc
    if anac(r)<10
-       fname=strcat(FolderName,'/','CHAN00',num2str(anac(r)),'.v2');
+       fname = strcat(FolderName,'/','CHAN00',num2str(anac(r)),'.v2');
    else
-       fname=strcat(FolderName,'/','CHAN0',num2str(anac(r)),'.v2');
+       fname = strcat(FolderName,'/','CHAN0',num2str(anac(r)),'.v2');
    end
    % read the acceleration and time step using the function readv2
-   [a to]=readv2(fname);
+   [a to] = readv2(fname);
    dat(:,r)=a;
 end
 
-d=size(dat,1); % total number of time steps
-dur=d*to;      % total duration
+d = size(dat,1); % total number of time steps
+dur = d*to;      % total duration
 
 % Sampling Frequency and Nyquist Frequency
 fo=1/to;
-fn=fo/2;
+fn = fo/2;
 
 %% 1. Data Pre-Processing 
 
@@ -441,8 +441,8 @@ fn=fo/2;
 
 % a) Baseline correction and removing the mean from the data using the function dtrend
 
-%datnn=dtrend(dat);
-datnn=dat;
+%datnn = dtrend(dat);
+datnn = dat;
 
 % b) Filtering the data
 
@@ -452,16 +452,16 @@ datnn=dat;
 %datnn= filter(b,a,datnn);
 
 % c) Decimating the data                
-datn=datnn(1:div:d,:);    % decimating data by selecting every div-th point.
+datn = datnn(1:div:d,:);    % decimating data by selecting every div-th point.
                           % Currebtly, div=1, so all data is used.
-to=to*div;                % sampling time increases due to decimating the data.
-dn=d/div;                 % total number of time steps after decimating = 
+to = to*div;                % sampling time increases due to decimating the data.
+dn = d/div;                 % total number of time steps after decimating = 
                           % total number of acceleration samples per channel 
 
-dati=datn(:,inpchns);     % accelerations at input channels after pre-processing,
+dati = datn(:,inpchns);     % accelerations at input channels after pre-processing,
                           % dati is a matrix with size dn x inpchns.
                           % # of rows is dn & # of columns is inpchns.
-dato=datn(:,outchns);     % accelerations at output channels after pre-processing,
+dato = datn(:,outchns);     % accelerations at output channels after pre-processing,
                           % dato is a matrix with size dn x outchns.
                           % # of rows is dn & # of columns is outchns.
 
@@ -474,69 +474,69 @@ dato=datn(:,outchns);     % accelerations at output channels after pre-processin
 % ii) Compute the system Markov parameters from the Markov matrices using recursive relations
 
 % defining several parameters
-temsiz=size(dato);
-temsizi=size(dati);
-m=temsiz(2);       %# of columns of dato = number of output channels  
-l=temsiz(1);       %# of rows of dato = # of rows of dati = # of acceleration samples per channel
-r=temsizi(2);      %# of columns of dati = number of input channels
+temsiz = size(dato);
+temsizi = size(dati);
+m = temsiz(2);       %# of columns of dato = number of output channels  
+l = temsiz(1);       %# of rows of dato = # of rows of dati = # of acceleration samples per channel
+r = temsizi(2);      %# of columns of dati = number of input channels
 
-p=mro;             %assign input model reduction order to variable p, consistent with Eq. 3.76  
+p = mro;             %assign input model reduction order to variable p, consistent with Eq. 3.76  
 
 % Compute matrix U that represents ARX equation of current output on p time steps of past output
 % & input values (Eq. 3.76)
-U=zeros((m+r)*p+r,l);
+U = zeros((m+r)*p+r,l);
 U(1:r,:)=dati';
 for b=2:p+1
    U((b-2)*(r+m)+1+r:(b-2)*(r+m)+r+r+m,b:l)=[dati(1:l-b+1,1:r)';dato(1:l-b+1,1:m)'];
 end
 
 % i) Compute the matrix of Observer Markov Parameter Matrix (M) in Eq 3.76 using Linear Regression
-[uu,s,v]=svd(U,0);     %svd: Singular Value Decomposition function in Matlab
+[uu,s,v] = svd(U,0);     %svd: Singular Value Decomposition function in Matlab
                        %s is a diagonal matrix with the singular values
-wr=diag(s);            %singular values are extracted from the diagonal matrix using diag function
+wr = diag(s);            %singular values are extracted from the diagonal matrix using diag function
 pg=(r+m)*p+r;
 for lop=1:(r+m)*p+r
    if wr(lop)<=0.001
-      pg=lop;
+      pg = lop;
       break
    end
 end
     
-pss=v(:,1:pg)*s(1:pg,1:pg)^-1*uu(:,1:pg)';
-M=dato'*pss;           %M: Observer Markov Parameter Matrix
+pss = v(:,1:pg)*s(1:pg,1:pg)^-1*uu(:,1:pg)';
+M = dato'*pss;           %M: Observer Markov Parameter Matrix
 
 % Fit for multiple regression
-ypreo=M*U;
+ypreo = M*U;
 
 for i=1:m
-   temsump=sum((dato(:,i)-ypreo(i,:)').^2);
+   temsump = sum((dato(:,i)-ypreo(i,:)').^2);
    Jpre(i)=temsump/(sum(dato(:,i).^2));
 end
 
-Markovparamerror=sum(Jpre)/m;  % RMSE between actual output & y on left hand side in Eq. 3.76
+Markovparamerror = sum(Jpre)/m;  % RMSE between actual output & y on left hand side in Eq. 3.76
                                % It should be quite small (e.g., 10^-3) for accurately computed Markow parameters
 sprintf('Simulation Error Average for OKID-ERA-DC %0.4g',Markovparamerror)
 
 % ii) Compute Markov parameters (Y) using recursive relations in Eqs. 3.78 & 3.79
 
 % Matrix D is directly equal to the Observer Markov parameter matrix (Eq. 3.77)
-D=M(:,1:r);  % D: Direct Transmission term, one of 4 system matrices of state space model
+D = M(:,1:r);  % D: Direct Transmission term, one of 4 system matrices of state space model
              % Eqs. 3.31-3.34 define the four system matrices, A, B, C & D
 Y{1}=D;
 % First p steps (Eq. 3.78)
 for ol=1:p
-   sumt=zeros(m,r);
+   sumt = zeros(m,r);
    for lok=1:ol
-      sumt=M(:,r+(lok-1)*(r+m)+1+r:r+(lok-1)*(r+m)+r+m)*Y{ol-lok+1}+sumt;
+      sumt = M(:,r+(lok-1)*(r+m)+1+r:r+(lok-1)*(r+m)+r+m)*Y{ol-lok+1}+sumt;
    end
    Y{ol+1}=M(:,r+(ol-1)*(r+m)+1:r+(ol-1)*(r+m)+r)+sumt;
 end
 
 % From p+1 to rest (Eq. 3.79)
-for ol=p+1:dn+kmax
-   sumt=zeros(m,r);
+for ol = p+1:dn+kmax
+   sumt = zeros(m,r);
    for lok=1:p
-      sumt=sumt+M(:,r+(lok-1)*(r+m)+1+r:r+(lok-1)*(r+m)+r+m)*Y{ol-lok+1};
+      sumt = sumt+M(:,r+(lok-1)*(r+m)+1+r:r+(lok-1)*(r+m)+r+m)*Y{ol-lok+1};
    end
    Y{ol+1}=+sumt;
 end
@@ -555,24 +555,24 @@ end
 
 %% 2c. Use H matrix to compute system matrices A, B & C wheer modal information is embedded.
 
-[R1,Sis,S1]=svd(H0); %singular value decomposition
+[R1,Sis,S1] = svd(H0); %singular value decomposition
 
-n=orm;               %assign order of model input to variable n, consistent with Eqs. 3.81-3.84  
+n = orm;               %assign order of model input to variable n, consistent with Eqs. 3.81-3.84  
 
-A=Sis(1:n,1:n)^(-0.5)*R1(:,1:n)'*H1*S1(:,1:n)*Sis(1:n,1:n)^(-0.5); %A: state transition matrix (Eqs. 3.32 & 3.82)
-Qb=Sis(1:n,1:n)^0.5*S1(:,1:n)';   
-B=Qb(:,1:r);                                                       %B: input influence matrix (Eqs. 3.32 & 3.83)
-Pb=R1(:,1:n)*Sis(1:n,1:n)^0.5;    
-C=Pb(1:m,:);                                                       %C: output influence matrix (Eqs. 3.34 & 3.84)
+A = Sis(1:n,1:n)^(-0.5)*R1(:,1:n)'*H1*S1(:,1:n)*Sis(1:n,1:n)^(-0.5); %A: state transition matrix (Eqs. 3.32 & 3.82)
+Qb = Sis(1:n,1:n)^0.5*S1(:,1:n)';   
+B = Qb(:,1:r);                                                       %B: input influence matrix (Eqs. 3.32 & 3.83)
+Pb = R1(:,1:n)*Sis(1:n,1:n)^0.5;    
+C = Pb(1:m,:);                                                       %C: output influence matrix (Eqs. 3.34 & 3.84)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% 2d. Obtain the modal information from the system matrices A, B & C
    % This includes determination of: a) modal frequencies, b) damping ratios & c) mode shapes 
 
-[v d]=eig(A);        %eigenvectors (d) & eiegenvalues (v) of the matrix A 
-cnd=condeig(A);      %condeig(A): gives a vector of condition numbers for the eigenvalues of A
-kit=log(diag(d));    %logarithm of the eigenvalues
+[v d] = eig(A);        %eigenvectors (d) & eiegenvalues (v) of the matrix A 
+cnd = condeig(A);      %condeig(A): gives a vector of condition numbers for the eigenvalues of A
+kit = log(diag(d));    %logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
 sj1=kit./to;              %to is the time step
@@ -606,15 +606,15 @@ for lk=1:2:n                        % from 1 to the model order, n
        freqdmp(koun,2)=damp1(lk);   % second column: identified damping ratio
        freqdmp(koun,3)=lk;          % third column: model order index (1:n)
        freqdmp(koun,4)=cnd(lk);     % condition number of the eigenvalue
-       koun=koun+1;
+       koun = koun+1;
    end
 end
 
 % c) Determination of mode shapes
-mod=C*v;                  %mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
-inm=v^-1*B;               %initial modal contribution
+mod = C*v;                  %mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
+inm = v^-1*B;               %initial modal contribution
    
-kss=size(freqdmp,1);
+kss = size(freqdmp,1);
 
 %extract mode shapes from mod corresponding to a frequency
 for q=1:kss
@@ -622,7 +622,7 @@ for q=1:kss
 end
 
 for q=1:kss
-   [mit om]=max(abs(real(modeshape(:,q))));
+   [mit om] = max(abs(real(modeshape(:,q))));
    modeshape(:,q)=real(modeshape(:,q))*1/mit*sign(real(modeshape(om,q)));
 end
 
@@ -654,26 +654,26 @@ end
 
 % b) Extended Modal Amplitude Coherence (EMAC)
 
-qlin=v^-1*Qb;  % Controllability Matrix used for the input-EMAC
-plin=Pb*v;     % Observability Matrix used for the output-EMAC
+qlin = v^-1*Qb;  % Controllability Matrix used for the input-EMAC
+plin = Pb*v;     % Observability Matrix used for the output-EMAC
 
-lamb=v^-1*A*v;
-bkh=v^-1*B;
+lamb = v^-1*A*v;
+bkh = v^-1*B;
 for hn=1:n
    for ll=0:l-1
       qhat(hn,ll*r+1:ll*r+r)=bkh(hn,:)*(lamb(hn,hn))^ll;
    end
 end
-selsiz=min(size(qlin),size(qhat));
+selsiz = min(size(qlin),size(qhat));
 
 for hnd=1:n
-   ql=qlin(hnd,1:selsiz(2));qh=qhat(hnd,1:selsiz(2));
+   ql = qlin(hnd,1:selsiz(2));qh = qhat(hnd,1:selsiz(2));
    mac(hnd)=abs(ql*qh')/(abs(ql*ql')*abs(qh*qh'))^0.5;
 end
 
 % Output EMAC (Eqs. 3.88-3.89)
 % Pick the last block row
-pto=plin((kmax-1)*m+1:m*kmax,:); % the identified value at T0
+pto = plin((kmax-1)*m+1:m*kmax,:); % the identified value at T0
 for ds=1:n
    ptop(:,ds)=mod(:,ds)*exp(sj1(ds)*to*(kmax-1));
 end
@@ -682,7 +682,7 @@ end
 for qa=1:n
     for qz=1:m
         Rij(qa,qz)=min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
-        Pij=angle(pto(qz,qa)/ptop(qz,qa));
+        Pij = angle(pto(qz,qa)/ptop(qz,qa));
         Pijn(qa,qz)=Pij;
         if abs(Pij)<=pi/4
             Wij(qa,qz)=1-abs(Pij)/(pi/4);
@@ -695,18 +695,18 @@ end
 
 % Input EMAC
 % Pick the last block column
-qto=qlin(:,(l-1)*r+1:l*r);
-qtop=d^((l-1))*inm;
+qto = qlin(:,(l-1)*r+1:l*r);
+qtop = d^((l-1))*inm;
 
 % EMAC Input Variation
 for er=1:l
-    qtovar=qlin(:,(er-1)*r+1:er*r);
-    qtopvar=d^(er-1)*inm;
+    qtovar = qlin(:,(er-1)*r+1:er*r);
+    qtopvar = d^(er-1)*inm;
 		% Computation of rik
         for qak=1:n
             for qzk=1:r
                 Rik(qak,qzk)=min((abs(qtovar(qak,qzk))/abs(qtopvar(qak,qzk))),(abs(qtopvar(qak,qzk))/abs(qtovar(qak,qzk))));
-                Pik=angle(qtovar(qak,qzk)/qtopvar(qak,qzk));
+                Pik = angle(qtovar(qak,qzk)/qtopvar(qak,qzk));
                 if abs(Pik)<=pi/4
                     Wik(qak,qzk)=1-abs(Pik)/(pi/4);
                 else
@@ -716,11 +716,11 @@ for er=1:l
             end
         end
       %Weight for emaci     
-      emacif=zeros(n,1);
+      emacif = zeros(n,1);
       for xc=1:n
          sumi=0;
          for lw=1:r
-             sumi=emaci(xc,lw)*(inm(xc,lw)*inm(xc,lw)')+sumi;
+             sumi = emaci(xc,lw)*(inm(xc,lw)*inm(xc,lw)')+sumi;
          end
       	emacif(xc)=sumi/(inm(xc,:)*inm(xc,:)');
       end
@@ -731,7 +731,7 @@ end
 for qak=1:n
    for qzk=1:r
       Rik(qak,qzk)=min((abs(qto(qak,qzk))/abs(qtop(qak,qzk))),(abs(qtop(qak,qzk))/abs(qto(qak,qzk))));
-      Pik=angle(qto(qak,qzk)/qtop(qak,qzk));
+      Pik = angle(qto(qak,qzk)/qtop(qak,qzk));
       if abs(Pik)<=pi/4
       	Wik(qak,qzk)=1-abs(Pik)/(pi/4);
    	else
@@ -746,12 +746,12 @@ for xc=1:n
    % Weight for emaco
    sumo=0;
    for la=1:m  
-      sumo=emaco(xc,la)*abs(mod(la,xc))^2+sumo;   
+      sumo = emaco(xc,la)*abs(mod(la,xc))^2+sumo;   
    end
    %Weight for emaci     
    sumi=0;
    for lw=1:r
-      sumi=emaci(xc,lw)*abs(inm(xc,lw))^2+sumi;
+      sumi = emaci(xc,lw)*abs(inm(xc,lw))^2+sumi;
    end
    emacof(xc)=sumo/((mod(:,xc)'*mod(:,xc)));           %emacof is the final output EMAC          
    emacif(xc)=sumi/(inm(xc,:)*inm(xc,:)');             %emacif is the final input EMAC
@@ -768,7 +768,7 @@ for lih=1:kss(1)
   else
       validationm=' not valid';
   end
-  scroutput=strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmp(lih,6)),', MPC= ',num2str(freqdmp(lih,7)), ' -->',' OKID-ERA-DC Identified Mode ',num2str(lih), ' is',validationm);
+  scroutput = strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmp(lih,6)),', MPC= ',num2str(freqdmp(lih,7)), ' -->',' OKID-ERA-DC Identified Mode ',num2str(lih), ' is',validationm);
   sprintf(scroutput)  
 end
 
@@ -779,14 +779,14 @@ end
 ms1=modstruc(A,B,C,D,zeros(n,m));
 th1=ms2th(ms1,'d');
 
-[e,r]=resid([dato dati],th1);
-[simy]=idsim([dati],th1);                % simy represents the estimated accelerations
+[e,r] = resid([dato dati],th1);
+[simy] = idsim([dati],th1);                % simy represents the estimated accelerations
 
 for i=1:m
-   temsum=sum((dato(:,i)-simy(:,i)).^2);
+   temsum = sum((dato(:,i)-simy(:,i)).^2);
    Jm(i)=temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
 end
-RMSEpred=sum(Jm)/m;
+RMSEpred = sum(Jm)/m;
 sprintf('Prediction Error Average for OKID-ERA-DC %0.4g',RMSEpred)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -889,18 +889,18 @@ n1=orm;      %Order of the model. # of computed and plotted modes depend on orm.
 % Accordingly, the code continues with Step 2a to compute the output & input vectors.
 
 % Calculate the usable size of the data matrix
-dn=size(dat,1)/div;       % total # time steps after decimating 
+dn = size(dat,1)/div;       % total # time steps after decimating 
 
-nsizS=dn-1-p+2;                                   
+nsizS = dn-1-p+2;                                   
 
-temsiz=size(dato);
-temsizi=size(dati);
-m=temsiz(2);              %# of columns of dato = number of output channels  
-l=temsiz(1);              %# of rows of dato = # of rows of dati = # of acceleration samples per channel
-r=temsizi(2);             %# of columns of dati = number of input channels                        
-ypS=zeros(r*p,nsizS);     %r is the number of input channels (computed with OKID-ERA-DC) 
+temsiz = size(dato);
+temsizi = size(dati);
+m = temsiz(2);              %# of columns of dato = number of output channels  
+l = temsiz(1);              %# of rows of dato = # of rows of dati = # of acceleration samples per channel
+r = temsizi(2);             %# of columns of dati = number of input channels                        
+ypS = zeros(r*p,nsizS);     %r is the number of input channels (computed with OKID-ERA-DC) 
                           %p is the number of steps used for the identification. It is an input parameter of SRIM
-upS=zeros(r*p,nsizS);
+upS = zeros(r*p,nsizS);
                           
 % Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)                          
 for b=1:p
@@ -911,12 +911,12 @@ end
 %% 2b. Compute the correlation terms and the coefficient matrix (Eqs. 3.68 & 3.69).
 
 % Compute the correlation terms (Eq. 3.68)
-Ryy=ypS*ypS'/nsizS;
-Ruu=upS*upS'/nsizS;
-Ruy=upS*ypS'/nsizS;
+Ryy = ypS*ypS'/nsizS;
+Ruu = upS*upS'/nsizS;
+Ruy = upS*ypS'/nsizS;
 
 %Compute the correlation matrix (Eq. 3.69)
-Rhh=Ryy-Ruy'*(Ruu^-1)*Ruy;
+Rhh = Ryy-Ruy'*(Ruu^-1)*Ruy;
 
 %% 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
 
@@ -925,12 +925,12 @@ Rhh=Ryy-Ruy'*(Ruu^-1)*Ruy;
 % Partial decomposition equations are available. They are commented out.
 
 % Full Decomposition Method
-[un1,s1,uo1]=svd(Rhh,0);               % Eq. 3.74
+[un1,s1,uo1] = svd(Rhh,0);               % Eq. 3.74
 Op1=un1(:,1:n1);                       % Eq. 3.72
 
 % Partial Decomposition Method
 %%KKKKK
-[un2,s2,uo2]=svd(Rhh(:,1:(p-1)*m),0);
+[un2,s2,uo2] = svd(Rhh(:,1:(p-1)*m),0);
 Op2=un2(:,1:n1);
 %%KKKKK
 
@@ -956,7 +956,7 @@ C2=Op2(1:m,:);
 % Output Error Minimization
 % Setting up the fi matrix
 %%KKKKK
-fi=zeros(m*nsizS,n1+m*r+n1*r);
+fi = zeros(m*nsizS,n1+m*r+n1*r);
 % 
 % First block column of fi
 for df=1:nsizS
@@ -965,30 +965,30 @@ end
 % 
 % Second block column of fi
 for df=1:nsizS
-    um=zeros(m,m*r);
-    um=kron(dati(df,:),eye(m,m));
+    um = zeros(m,m*r);
+    um = kron(dati(df,:),eye(m,m));
     fi((df-1)*m+1:df*m,n1+1:n1+m*r)=um;
 end
 % 
 % Third block column of fi
 for df=2:nsizS
-    summ=zeros(m,n1*r);
+    summ = zeros(m,n1*r);
     for nmf=1:df-1
-        summ=C1*A1^(df-nmf-1)*kron(dati(nmf,:),eye(n1,n1))+summ;
+        summ = C1*A1^(df-nmf-1)*kron(dati(nmf,:),eye(n1,n1))+summ;
     end
     fi((df-1)*m+1:df*m,n1+m*r+1:n1+m*r+n1*r)=summ;
 end
 % 
-dattemp=dato(1:nsizS,:)';
-y=dattemp(:);
+dattemp = dato(1:nsizS,:)';
+y = dattemp(:);
 % 
-teta=pinv(fi)*y;
+teta = pinv(fi)*y;
 x0=teta(1:n1);
-dcol=teta(n1+1:n1+m*r);
-bcol=teta(n1+m*r+1:n1+m*r+n1*r);
+dcol = teta(n1+1:n1+m*r);
+bcol = teta(n1+m*r+1:n1+m*r+n1*r);
 % 
-n=n1;
-D=zeros(m,r);B=zeros(n,r);
+n = n1;
+D = zeros(m,r);B = zeros(n,r);
 % Obtain D
 for wq=1:r
     D(:,wq)=dcol((wq-1)*m+1:wq*m);
@@ -1002,12 +1002,12 @@ end
 %% 2e. Obtain the modal information from the system matrices A & C
 % This includes determination of: a) modal frequencies, b) damping ratios & c) mode shapes 
 
-[vS dS]=eig(A1);       %eigenvectors (d) & eiegenvalues (v) of matrix A 
-cndS=condeig(A1);      %condeig(A): gives a vector of condition numbers for the eigenvalues of A
-kitS=log(diag(dS));    %logarithm of the eigenvalues
+[vS dS] = eig(A1);       %eigenvectors (d) & eiegenvalues (v) of matrix A 
+cndS = condeig(A1);      %condeig(A): gives a vector of condition numbers for the eigenvalues of A
+kitS = log(diag(dS));    %logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
-sj1S=kitS./to;         %to is the time step
+sj1S = kitS./to;         %to is the time step
 freq1S=((sj1S.*conj(sj1S)).^0.5)/(2*pi);
 
 % selection of proper roots
@@ -1037,17 +1037,17 @@ for lk=1:2:n                             % from 1 to the model order, n
        freqdmpSRIM(koun,2)=damp1S(lk);   % second column: identified damping ratio
        freqdmpSRIM(koun,3)=lk;           % third column: model order index (1:n)
        freqdmpSRIM(koun,4)=cndS(lk);     % condition number of the eigenvalue
-       koun=koun+1;
+       koun = koun+1;
    end
 end
 
 % c) Determination of mode shapes
-mod=C1*vS;                  %mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
+mod = C1*vS;                  %mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
 %%KKKKK
-inm=v^-1*B;                 %initial modal contribution
+inm = v^-1*B;                 %initial modal contribution
 %%KKKKK
    
-kss=size(freqdmpSRIM,1);
+kss = size(freqdmpSRIM,1);
 
 %extract mode shapes from mod corresponding to a frequency
 for q=1:kss
@@ -1055,7 +1055,7 @@ for q=1:kss
 end
 
 for q=1:kss
-   [mit om]=max(abs(real(modeshapeSRIM(:,q))));
+   [mit om] = max(abs(real(modeshapeSRIM(:,q))));
    modeshapeSRIM(:,q)=real(modeshapeSRIM(:,q))*1/mit*sign(real(modeshapeSRIM(om,q)));
 end
 
@@ -1091,11 +1091,11 @@ end
 % Note that the computations are commented out as the matrix B is needed
 
 %%KKKKK
-plin=Op1*vS;     % Observability Matrix used for the output-EMAC
-lamb=vS^-1*A1*vS;
-bkh=vS^-1*B;
+plin = Op1*vS;     % Observability Matrix used for the output-EMAC
+lamb = vS^-1*A1*vS;
+bkh = vS^-1*B;
 % Pick the last block row
-pto=plin((p-1)*m+1:m*p,:); % the identified value at T0
+pto = plin((p-1)*m+1:m*p,:); % the identified value at T0
 for ds=1:n
     ptop(:,ds)=mod(:,ds)*exp(sj1S(ds)*to*(p-1));
  end
@@ -1103,7 +1103,7 @@ for ds=1:n
 for qa=1:n
     for qz=1:m
         Rij(qa,qz)=min((abs(pto(qz,qa))/abs(ptop(qz,qa))),(abs(ptop(qz,qa))/abs(pto(qz,qa))));
-        Pij=angle(pto(qz,qa)/ptop(qz,qa));
+        Pij = angle(pto(qz,qa)/ptop(qz,qa));
         Pijn(qa,qz)=Pij;
         if abs(Pij)<=pi/4
            Wij(qa,qz)=1-abs(Pij)/(pi/4);
@@ -1118,7 +1118,7 @@ for xc=1:n
 % Weight for emaco
     sumo=0;
     for la=1:m  
-        sumo=emaco(xc,la)*abs(mod(la,xc))^2+sumo;   
+        sumo = emaco(xc,la)*abs(mod(la,xc))^2+sumo;   
     end
     emacof(xc)=sumo/((mod(:,xc)'*mod(:,xc)));
     emac(xc)=emaco(xc);
@@ -1134,7 +1134,7 @@ for lih=1:kss(1)
   else
       validationm=' not valid';
   end
-  scroutput=strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmpSRIM(lih,5)),', MPC= ',num2str(freqdmpSRIM(lih,6)), ' -->',' SRIM Identified Mode ',num2str(lih), ' is',validationm);
+  scroutput = strcat('Mode',num2str(lih), ': Output EMAC= ',num2str(freqdmpSRIM(lih,5)),', MPC= ',num2str(freqdmpSRIM(lih,6)), ' -->',' SRIM Identified Mode ',num2str(lih), ' is',validationm);
   sprintf(scroutput) 
 end
 
@@ -1148,15 +1148,15 @@ end
 %%KKKKK
 ms1=modstruc(A1,B,C1,D,zeros(n,m),x0);
 th1=ms2th(ms1,'d');
-[e,r]=resid([dato dati],th1);
-[simy]=idsim([dati],th1);                % simy represents the estimated accelerations
+[e,r] = resid([dato dati],th1);
+[simy] = idsim([dati],th1);                % simy represents the estimated accelerations
 % 
 for i=1:m
-    temsum=sum((dato(:,i)-simy(:,i)).^2);
+    temsum = sum((dato(:,i)-simy(:,i)).^2);
     Jm(i)=temsum/(sum(dato(:,i).^2));     %Root mean square error of estimated accelerations
 end
-RMSEpredSRIM=sum(Jm)/m;
-sprintf('Prediction Error Average for SRIM %0.4g',RMSEpredSRIM)
+RMSEpredSRIM = sum(Jm)/m;
+sprintf('Prediction Error Average for SRIM %0.4g', RMSEpredSRIM)
 %%KKKKK
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
