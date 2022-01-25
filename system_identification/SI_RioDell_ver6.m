@@ -20,7 +20,7 @@ g=981;                                           %acceleration of gravity in cm/
 %% Inputs
 
 inputname = input('Do you want to input folder name [Y/N]:', 's');
-if isempty(inputname) || inputname=='N' || inputname=='n'
+if isempty(inputname) || inputname == 'N' || inputname == 'n'
     inputname = 'N';
     FolderName='RioDell_Petrolia_Processed_Data';    %Name of folder with processed CSMIP data files for main EQ
    %FolderName='RioDell_Petrolia_AS'  %Name of folder with processed CSMIP data files for aftershock
@@ -66,27 +66,27 @@ tic
 %%% PART 1: Transfer Function (TF) Estimate %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if Case=='Case1'
+if Case == 'Case1'
     OutChan=7;                               %Output channel #, generally, it is on bridge
     InpChan=3;                               %Input channel #, generally, it is at base
 end
          
-if Case=='Case2'
+if Case == 'Case2'
     OutChan=11;                              %Output channel #, generally, it is on bridge
     InpChan=1;                               %Input channel #, generally, it is at base
 end
          
-if Case=='Case3'
+if Case == 'Case3'
     OutChan=6;                               %Output channel #, generally, it is on bridge
     InpChan=1;                               %Input channel #, generally, it is at base
 end
 
-if Case=='Case4'
+if Case == 'Case4'
     OutChan=6;                               %Output channel #, generally, it is on bridge
     InpChan=1;                               %Input channel #, generally, it is at base
 end
 
-if Case=='Case5'
+if Case == 'Case5'
     OutChan=6;                               %Output channel #, generally, it is on bridge
     InpChan=2;                               %Input channel #, generally, it is at base
 end
@@ -112,12 +112,12 @@ for jj=1:2
 % Read the input and output channel data using the corresponding filenames
 % jj=1 corresponds to the input channel
 % jj=2 corresponds to the output channel
-if jj==1
+if jj == 1
     filename = inpfilename;
     Channel = InpChan;
 end
 
-if jj==2
+if jj == 2
     filename = outfilename;
     Channel = OutChan;
 end
@@ -147,7 +147,7 @@ per=0.02:0.01:1;
 % MyFFT is the function that computes the FA spectrum
 SA = respspec(dt,dmp,per,acc');
 [ff1,FFA] = MyFFT(dt,acc,1);
-if jj==1
+if jj == 1
     SA1=SA;
     FFA1=FFA;
     % Plot the response spectrum of the input channel
@@ -159,7 +159,7 @@ if jj==1
     str = {'Response spectrum of the input channel',strcat('Channel =',num2str(InpChan)),strcat('Damping ratio (%) =',num2str(dmp*100))};
     text(0.4,max(SA1)/g*0.85,str)
 
-elseif jj==2
+elseif jj == 2
     SA2=SA;
     FFA2=FFA;
     % Plot the response spectrum of the output channel
@@ -189,7 +189,7 @@ end
 
 % compute the period as the value that corresponds to the peak of the spectrum
 Ampap = max(TT);
-ind1=find(TT==Ampap);
+ind1=find(TT == Ampap);
 Period = per(ind1);
 
 % compute the damping ratio using the Half-power bandwidth method 
@@ -197,7 +197,7 @@ Amp1=Ampap/sqrt(2);
 
 cond=1;
 i = ind1;
-while cond==1
+while cond == 1
     i = i-1;
     if TT(i)<Amp1
         slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
@@ -209,7 +209,7 @@ end
 
 cond=1;
 i = ind1;
-while cond==1
+while cond == 1
     i = i+1;
     if TT(i)<Amp1
         slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
@@ -238,10 +238,10 @@ hold off;
 % and the range can be chosen as wide as the entire range.
 
 % Compute the period as the value that corresponds to the peak of the spectrum
-indmin = find(per==Minperiod);
-indmax = find(per==Maxperiod);
+indmin = find(per == Minperiod);
+indmax = find(per == Maxperiod);
 Amp = max(TT(indmin:indmax));
-ind1=find(TT==Amp);
+ind1=find(TT == Amp);
 Period2=per(ind1);
 
 % compute the damping ratio using the Half-power bandwidth method 
@@ -249,7 +249,7 @@ Amp1=Amp/sqrt(2);
 
 cond=1;
 i = ind1;
-while cond==1
+while cond == 1
     i = i-1;
     if TT(i)<Amp1
         slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
@@ -261,7 +261,7 @@ end
 
 cond=1;
 i = ind1;
-while cond==1
+while cond == 1
     i = i+1;
     if TT(i)<Amp1
         slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
@@ -354,31 +354,31 @@ tic
 %Case 5: Input in vertical direction, output in vertical direction
          %Input channels: 2; Output channel: 10, 8, 6
          
-if Case=='Case1'
+if Case == 'Case1'
     anac = [17 3 20 9 7 4]; %Channel #s, 1st 3 are input channels & 2nd 3 are output channels
     inpchns=1:3;          %Specify the indices of input channels
     outchns=4:6;          %Specify the indices of output channels
 end
 
-if Case=='Case2'
+if Case == 'Case2'
     anac = [1 11];
     inpchns=1;            %Specify the indices of input channels
     outchns=2;            %Specify the indices of output channels
 end
 
-if Case=='Case3'
+if Case == 'Case3'
     anac = [1 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:4;          %Specify the indices of output channels
 end
 
-if Case=='Case4'
+if Case == 'Case4'
     anac = [1 11 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:5;          %Specify the indices of output channels
 end
 
-if Case=='Case5'
+if Case == 'Case5'
     anac = [2 10 8 6];
     inpchns=1;            %Specify the indices of input channels
     outchns=2:4;          %Specify the indices of output channels
@@ -580,16 +580,16 @@ freq1=((sj1.*conj(sj1)).^0.5)/(2*pi);
 
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if freq1(1,1)==freq1(2,1)
+if freq1(1,1) == freq1(2,1)
    freq1(1,2)=1;
 end
 
-if freq1(n,1)==freq1(n-1,1)
+if freq1(n,1) == freq1(n-1,1)
    freq1(n,2)=1;
 end
 
 for hw=2:n-1
-   if freq1(hw,1)==freq1(hw+1,1) | freq1(hw,1)==freq1(hw-1,1);
+   if freq1(hw,1) == freq1(hw+1,1) | freq1(hw,1) == freq1(hw-1,1);
       freq1(hw,2)=1;
    end
 end
@@ -601,7 +601,7 @@ damp1=-(real(sj1))./(2*pi*freq1);
 % Represent the identified frequency & damping information of the proper roots in a matrix
 koun=1;
 for lk=1:2:n                        % from 1 to the model order, n
-   if freq1(lk,2)==1                % 1 indicates that it is a proper root
+   if freq1(lk,2) == 1                % 1 indicates that it is a proper root
        freqdmp(koun,1)=freq1(lk);   % first column: identified frequency 
        freqdmp(koun,2)=damp1(lk);   % second column: identified damping ratio
        freqdmp(koun,3)=lk;          % third column: model order index (1:n)
@@ -1012,16 +1012,16 @@ freq1S=((sj1S.*conj(sj1S)).^0.5)/(2*pi);
 
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if freq1S(1,1)==freq1S(2,1)
+if freq1S(1,1) == freq1S(2,1)
    freq1S(1,2)=1;
 end
 
-if freq1S(n,1)==freq1S(n-1,1)
+if freq1S(n,1) == freq1S(n-1,1)
    freq1S(n,2)=1;
 end
 
 for hw=2:n-1
-   if freq1S(hw,1)==freq1S(hw+1,1) | freq1S(hw,1)==freq1S(hw-1,1);
+   if freq1S(hw,1) == freq1S(hw+1,1) | freq1S(hw,1) == freq1S(hw-1,1);
       freq1S(hw,2)=1;
    end
 end
@@ -1032,7 +1032,7 @@ damp1S=-(real(sj1S))./(2*pi*freq1S);
 % Represent the identified frequency & damping information of the proper roots in a matrix
 koun=1;
 for lk=1:2:n                             % from 1 to the model order, n
-   if freq1S(lk,2)==1                    % 1 indicates that it is a proper root
+   if freq1S(lk,2) == 1                    % 1 indicates that it is a proper root
        freqdmpSRIM(koun,1)=freq1S(lk);   % first column: identified frequency 
        freqdmpSRIM(koun,2)=damp1S(lk);   % second column: identified damping ratio
        freqdmpSRIM(koun,3)=lk;           % third column: model order index (1:n)
