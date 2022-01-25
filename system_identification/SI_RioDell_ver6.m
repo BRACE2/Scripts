@@ -148,8 +148,8 @@ per=0.02:0.01:1;
 SA = respspec(dt,dmp,per,acc');
 [ff1,FFA] = MyFFT(dt,acc,1);
 if jj == 1
-    SA1=SA;
-    FFA1=FFA;
+    SA1 = SA;
+    FFA1 = FFA;
     % Plot the response spectrum of the input channel
     figure;
     plot(per,SA1/g);
@@ -189,20 +189,20 @@ end
 
 % compute the period as the value that corresponds to the peak of the spectrum
 Ampap = max(TT);
-ind1=find(TT == Ampap);
+ind1 = find(TT == Ampap);
 Period = per(ind1);
 
 % compute the damping ratio using the Half-power bandwidth method 
-Amp1=Ampap/sqrt(2);
+Amp1 = Ampap/sqrt(2);
 
-cond=1;
+cond = 1;
 i = ind1;
 while cond == 1
     i = i-1;
-    if TT(i)<Amp1
-        slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
+    if TT(i) < Amp1
+        slope = (TT(i+1)-TT(i))/(per(i+1)-per(i));
 % T1 is the period to the left of Tn
-        T1=(Amp1-TT(i))/slope+per(i);
+        T1 = (Amp1-TT(i))/slope+per(i);
         cond=2;        
     end
 end
@@ -212,9 +212,9 @@ i = ind1;
 while cond == 1
     i = i+1;
     if TT(i)<Amp1
-        slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
+        slope = (TT(i)-TT(i-1))/(per(i)-per(i-1));
 % T2 is the period to the right of Tn
-        T2=(Amp1-TT(i-1))/slope+per(i-1);
+        T2 = (Amp1-TT(i-1))/slope+per(i-1);
         cond=2;        
     end
 end
@@ -223,7 +223,7 @@ f1=1/T1;
 f2=1/T2;
 fn=1/Period;
 
-dmpratio=(f1-f2)/(2*fn)*100;
+dmpratio = (f1-f2)/(2*fn)*100;
 
 plot(Period,Ampap,'o');
 hold off;
@@ -252,9 +252,9 @@ i = ind1;
 while cond == 1
     i = i-1;
     if TT(i)<Amp1
-        slope=(TT(i+1)-TT(i))/(per(i+1)-per(i));
+        slope = (TT(i+1)-TT(i))/(per(i+1)-per(i));
 % T1 is the period to the left of Tn
-        T1=(Amp1-TT(i))/slope+per(i);
+        T1 = (Amp1-TT(i))/slope+per(i);
         cond=2;        
     end
 end
@@ -264,9 +264,9 @@ i = ind1;
 while cond == 1
     i = i+1;
     if TT(i)<Amp1
-        slope=(TT(i)-TT(i-1))/(per(i)-per(i-1));
+        slope = (TT(i)-TT(i-1))/(per(i)-per(i-1));
 % T2 is the period to the right of Tn
-        T2=(Amp1-TT(i-1))/slope+per(i-1);
+        T2 = (Amp1-TT(i-1))/slope+per(i-1);
         cond=2;        
     end
 end
@@ -275,7 +275,7 @@ f1=1/T1;
 f2=1/T2;
 fn=1/Period2;
 
-dmpratio2=(f1-f2)/(2*fn)*100;
+dmpratio2 = (f1-f2)/(2*fn)*100;
 
 % Add text to the transfer function figure listing the identified period & damoing ratio
 str = {strcat('Output Channel # =',num2str(OutChan)),strcat('Input Channel # =',num2str(InpChan))};
@@ -494,7 +494,7 @@ end
 [uu,s,v] = svd(U,0);     %svd: Singular Value Decomposition function in Matlab
                        %s is a diagonal matrix with the singular values
 wr = diag(s);            %singular values are extracted from the diagonal matrix using diag function
-pg=(r+m)*p+r;
+pg = (r+m)*p+r;
 for lop=1:(r+m)*p+r
    if wr(lop)<=0.001
       pg = lop;
@@ -576,7 +576,7 @@ kit = log(diag(d));    %logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
 sj1=kit./to;              %to is the time step
-freq1=((sj1.*conj(sj1)).^0.5)/(2*pi);
+freq1 = ((sj1.*conj(sj1)).^0.5)/(2*pi);
 
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1008,7 +1008,7 @@ kitS = log(diag(dS));    %logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
 sj1S = kitS./to;         %to is the time step
-freq1S=((sj1S.*conj(sj1S)).^0.5)/(2*pi);
+freq1S = ((sj1S.*conj(sj1S)).^0.5)/(2*pi);
 
 % selection of proper roots
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1027,7 +1027,7 @@ for hw=2:n-1
 end
 
 % b) Determination of damping ratios (Eqs. 3.46 & 3.39) 
-damp1S=-(real(sj1S))./(2*pi*freq1S);
+damp1S = -(real(sj1S))./(2*pi*freq1S);
 
 % Represent the identified frequency & damping information of the proper roots in a matrix
 koun = 1;
@@ -1146,8 +1146,8 @@ end
 % Prediction using state space model
 
 %%KKKKK
-ms1=modstruc(A1,B,C1,D,zeros(n,m),x0);
-th1=ms2th(ms1,'d');
+ms1 = modstruc(A1,B,C1,D,zeros(n,m),x0);
+th1 = ms2th(ms1,'d');
 [e,r] = resid([dato dati],th1);
 [simy] = idsim([dati],th1);                % simy represents the estimated accelerations
 % 
