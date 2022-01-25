@@ -1154,7 +1154,6 @@ function fi = block_3(df, m, CA_powers, dati, n1, r)
     In1n1 = speye(n1,n1);
     fi = zeros(m, (n1+m*r+n1*r) - (n1+m*r+1)+1);  
     for nmf = 1:df-1
-        %fi(a:b,c:d) = fi(a:b,c:d) + CA_powers(:,:,df-nmf)*kron(dati(nmf,:),In1n1);
         fi = fi + CA_powers(:,:,df-nmf)*kron(dati(nmf,:),In1n1);
     end
 end
