@@ -495,7 +495,7 @@ end
 wr = diag(s);            %singular values are extracted from the diagonal matrix using diag function
 pg = (r+m)*p+r;
 for lop = 1:(r+m)*p+r
-   if wr(lop)< = 0.001
+   if wr(lop) <= 0.001
       pg = lop;
       break
    end
@@ -767,6 +767,12 @@ for lih = 1:kss(1)
   else
       validationm=' not valid';
   end
+  scroutput = strcat(...
+    'Mode',num2str(lih), ...
+    ': Output EMAC= ',num2str(freqdmp(lih,6)),...
+    ', MPC= ',num2str(freqdmp(lih,7)), ...
+    ' -->',' OKID-ERA-DC Identified Mode ',num2str(lih),...
+    ' is',validationm);
   sprintf(scroutput)  
 end
 
