@@ -23,9 +23,6 @@ function [freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM] = SRIM(dati, dato, config)
 %%KKKKK
 %%%
 
-% Note that the input and output channels are common to OKID-ERA-DC and SRIM.
-% They are already input as the OKID-ERA-DC inputs.
-
 % Modelparameters
 dn = config.dn;
 to = config.to;
