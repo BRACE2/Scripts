@@ -3,8 +3,7 @@ function [freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM] = SRIM(dati, dato, config)
 % More information on SRIM algorithm can be found in Sections 3.4.4 & 3.4.5 of (Arici & Mosalam, 2006).
 % Equations below refer to this report. SRIM is a MIMO SI method that is based on state space identification
 % using least squares and consists of the following steps:
-% 1. Data pre-processing (baseline correction, filtering & decimation). Same as in OKID-ERA-DC.
-% 2. Represent the ouput vector in terms of input and state vectors, Eq. (3.57), which is broken into these 6 steps:
+%
 % 2a. Determine output (y) & input (u) vectors [Eqs. 3.58 & 3.60].
 % 2b. Compute the correlation terms & the coefficient matrix (Eqs. 3.68 & 3.69).
 % 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
@@ -13,11 +12,30 @@ function [freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM] = SRIM(dati, dato, config)
 % 2f. Spatial & temporal validation of the identified modes.
 % 2g. Back calculate (estimate) the output accelerations with the state-space system &
 %     check against the actual output accelerations.
+%
 % Notes: Computation of B & D matrices take very long time (not possible to get a result until now)
 % becuase of the excessive matrix operations in lines 944-950. Matrices B & D are not needed for computation of
 % periods, damping ratios, or mode shapes. However, they are needed for part of step 2f and the entire step 2g.
 % Therefore, these steps are not pursued. Relevant compuations are left commented out for now in case we find
 % efficient ways of computing these later.
+%
+% For orm = 2, one mode is found, for orm = 4, two modes are found.
+% For case 1, one mode is transverse & the other is torsion.
+% For all other cases, the second mode is a higher mode.
+% Sometimes higher orm still gives fewer modes, e.g. orm = 8 for case 1 gives
+% three modes, but one of them is invalid according to the EMAC & MPC criteria.
+% same orm in OKID-ERA-DC is used. It can be changed if needed.
+%
+% Important output variables:
+%  1. freqdampSRIM variable is a matrix that includes the information of identified
+%     frequencies, damping ratios & validation of the modes with MPC & EMAC criteria.
+%     Each row of freqdamp corresponds to a mode. Columns are as follows:
+%     1)frequency, 2)damping ratio, 3)order index, 4)condition number, 5)MPC.
+%     If values in columns 5 is > 0.5, identified mode is valid.
+%  2. modeshapeSRIM stores the mode shape information for identified modes.
+%  3. RMSEpredSRIM: root mean square error of the predicted output from
+%     identified parameters with respect to the actual output (currently
+%     commented out).
 %%KKKKK
 % Lines between these can be commented. But for now they are uncommented for testing
 %%KKKKK
@@ -31,23 +49,6 @@ dt = to;
 p = config.p;         % # steps used for the identification. Referred to as the prediction horizon in literature
 n1 = config.orm;      % Order of the model. # of computed and plotted modes depend on orm.
 
-%For orm = 2, one mode is found, for orm = 4, two modes are found.
-%For case 1, one mode is transverse & the other is torsion.
-%For all other cases, the second mode is a higher mode.
-%Sometimes higher orm still gives fewer modes, e.g. orm = 8 for case 1 gives
-%three modes, but one of them is invalid according to the EMAC & MPC criteria.
-%same orm in OKID-ERA-DC is used. It can be changed if needed.
-
-% Important output variables:
-%  1. freqdampSRIM variable is a matrix that includes the information of identified
-%     frequencies, damping ratios & validation of the modes with MPC & EMAC criteria.
-%     Each row of freqdamp corresponds to a mode. Columns are as follows:
-%     1)frequency, 2)damping ratio, 3)order index, 4)condition number, 5)MPC.
-%     If values in columns 5 is > 0.5, identified mode is valid.
-%  2. modeshapeSRIM stores the mode shape information for identified modes.
-%  3. RMSEpredSRIM: root mean square error of the predicted output from
-%     identified parameters with respect to the actual output (currently
-%     commented out).
 %
 %% 2a. Compute y (output) and u (input) vectors (Eqs. 3.58 & 3.60)
 
@@ -93,22 +94,17 @@ Rhh = Ryy - Ruy'*(Ruu\Ruy);
 [un1,s1,uo1] = svd(Rhh,0);               % Eq. 3.74
 Op1 = un1(:,1:n1);                       % Eq. 3.72
 
-% Partial Decomposition Method
-%%KKKKK
-[un2,s2,uo2] = svd(Rhh(:,1:(p-1)*m),0);
-Op2 = un2(:,1:n1);
-%%KKKKK
-
 %% 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
 
 % Determine the system matrices A & C (1 & 2 indicate the ones corresponding
 % to full & partial decomposition, respectively. 2 is commented out)
 A1 = lsqminnorm(Op1(1:(p-1)*m,:), Op1(m+1:p*m,:));
-%%KKKKK
-%A2 = lsqminnorm(Op2(1:(p-1)*m,:), Op2(m+1:p*m,:));
-%%KKKKK
 C1 = Op1(1:m,:);
 %%KKKKK
+% Partial Decomposition Method
+[un2,s2,uo2] = svd(Rhh(:,1:(p-1)*m),0);
+%A2 = lsqminnorm(Op2(1:(p-1)*m,:), Op2(m+1:p*m,:));
+Op2 = un2(:,1:n1);
 %C2 = Op2(1:m,:);
 %%KKKKK
 
@@ -121,7 +117,7 @@ C1 = Op1(1:m,:);
 % Output Error Minimization
 % Setting up the fi matrix
 %%KKKKK
-fi = zeros(m*nsizS, n1+m*r+n1*r);
+fi  = zeros(m*nsizS, n1+m*r+n1*r);
 A_p = A1;
 CA_powers = zeros(m, size(A1,2), 1+nsizS);
 CA_powers(:,:,1) = C1*A_p;
@@ -154,7 +150,6 @@ parfor df = 2:nsizS
     b = df*m;
     fi3(:,:,df) = block_3(df, m, CA_powers, dati, n1, r, C1);
 end
-
 for df = 2:nsizS
     a = (df-1)*m+1;
     b = df*m;
