@@ -529,7 +529,7 @@ class PlotlyPlotter(Plotter):
 def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
-    if opts["elems_by_type"]:
+    if "elems_by_type" in opts and opts["elems_by_type"]:
         frames = plt._get_frames()
     else:
         frames = plt._get_frames()
