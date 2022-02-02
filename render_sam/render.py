@@ -1,5 +1,8 @@
 #!/bin/env python
-
+# # Synopsis
+#
+# >`render.py [<options>] <model-file>
+#
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
 # 
 #
@@ -111,6 +114,7 @@ Config = lambda : {
   "show_objects": ["frames", "frames.displ", "nodes"],
   "hide_objects": ["origin"],
   "sam_file":     None,
+  "elem_by_type": False,
   "res_file":     None,
   "write_file":   None,
   "displ":        [],
@@ -228,8 +232,8 @@ def read_model(filename:str)->dict:
 # relations for standard frame models.
 
 # Helper functions for extracting rotations in planes
-elev_dofs = lambda u: u[[1,2]]
-plan_dofs = lambda u: u[[3,4]]
+elev_dofs = lambda v: v[[1,2]]
+plan_dofs = lambda v: v[[3,4]]
 
 def get_dof_num(dof:str, axes:list):
     try: return int(dof)
@@ -291,9 +295,9 @@ def rotation(xyz: Array, vert=(0,0,-1))->Array:
 
 def displaced_profile(
         coord: Array,
-        displ: Array,  #: Displacements
-        vect=None,         #: Element orientation vector
-        glob:bool=True,    #: Transform to global coordinates
+        displ: Array,        #: Displacements
+        vect : Array = None, #: Element orientation vector
+        glob : bool  = True, #: Transform to global coordinates
         npoints:int = 10,
     )->Array:
     n = npoints
@@ -427,7 +431,7 @@ class GnuPlotter(Plotter):
 
 
 
-class PlotlyPlotter(Plotter): 
+class PlotlyPlotter(Plotter):
     def plot(x,y,**opts):
         pass
 
@@ -445,7 +449,7 @@ class PlotlyPlotter(Plotter):
             # exclude zero-length elements
             if "zero" not in el["type"].lower():
                 glob_displ = [
-                    u for n in el["nodes"] 
+                    u for n in el["nodes"]
                     #   extract displ from node, default to ndf zeros
                         for u in res.get(n,[0.0]*frame["nodes"][n]["ndf"])
                 ]
@@ -453,11 +457,22 @@ class PlotlyPlotter(Plotter):
                 coords[(N+1)*i:(N+1)*i+N,:] = displaced_profile(el["crd"], glob_displ, vect=vect, npoints=N)[axes].T
         x,y,z = coords.T
         return {
-            "type": "scatter3d", 
-            "mode": "lines", 
-            "x": x, "y": y, "z": z, 
-            "line": {"color":props["color"]}, 
+            "type": "scatter3d",
+            "mode": "lines",
+            "x": x, "y": y, "z": z,
+            "line": {"color":props["color"]},
             "hoverinfo":"skip"
+        }
+    def make_hover_data(self, data, ln=None):
+        if ln is None:
+            items = np.array([d.values for d in data])
+            keys = data[0].keys()
+        else:
+            items = np.array([list(data.values())]*ln)
+            keys = data.keys()
+        return {
+            "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
+            "customdata": list(items),
         }
 
     def _get_nodes(self):
@@ -466,7 +481,7 @@ class PlotlyPlotter(Plotter):
         nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
         return {
                 "name": "nodes",
-                "x": x, "y": y, "z": z, 
+                "x": x, "y": y, "z": z,
                 "type": "scatter3d","mode": "markers",
                 "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
                 "customdata": list(nodes),
@@ -491,35 +506,38 @@ class PlotlyPlotter(Plotter):
                 #"marker": {"opacity": 0.0,"size": 0.0, "line": {"width": 0.0}}
         }
 
-    def _get_frames(self):
+    def _get_frames(self, elems=None):
         N = 4
         axes = self.axes
-        model = self.model
+        elems = elems or self.model["elems"]
         props = {"color": "#808080", "alpha": 0.6}
-        coords = np.zeros((len(model["elems"])*N,NDM))
+        coords = np.zeros((len(elems)*N,NDM))
         coords.fill(np.nan)
-        for i,e in enumerate(model["elems"].values()):
+        for i,e in enumerate(elems.values()):
             coords[N*i:N*i+N-1,:] = np.linspace(*e["crd"][:,axes], N-1)
         self._frame_coords = coords
         x,y,z = coords.T
-        return {
-            "type": "scatter3d", 
-            "mode": "lines", 
-            "x": x, "y": y, "z": z, 
-            "line": {"color":props["color"]}, 
+        return [{
+            "type": "scatter3d",
+            "mode": "lines",
+            "x": x, "y": y, "z": z,
+            "line": {"color":props["color"]},
             "hoverinfo":"skip"
-        }
-    
+        }]
+
 
 def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
-    frames = plt._get_frames()
+    if opts["elems_by_type"]:
+        frames = plt._get_frames()
+    else:
+        frames = plt._get_frames()
     labels = plt._get_frame_labels()
     nodes = plt._get_nodes()
     fig = go.Figure(dict(
             #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
-            data=[frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
+            data=[*frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
             layout=go.Layout(
                 scene=dict(aspectmode='data',
                      xaxis_visible=False,
@@ -592,6 +610,9 @@ def parse_args(argv)->dict:
                 opts["view"] = arg[2:] if len(arg) > 2 else next(args)
             elif arg == "--view":
                 opts["view"] = next(args)
+
+            elif arg == "--elem-by-type":
+                opts["elem_by_type"] = True
 
             #elif arg[:2] == "-m":
             #    opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
