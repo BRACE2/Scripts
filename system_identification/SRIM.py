@@ -6,6 +6,11 @@ from tqdm import tqdm
 import jax
 import jax.numpy as jnp
 
+import os
+# after importing numpy, reset the CPU affinity of the parent process so
+# that it will use all cores
+os.system("taskset -p 0xff %d" % os.getpid())
+
 
 linsolve = np.linalg.solve
 lsqminnorm = lambda *args: np.linalg.lstsq(*args, rcond=None)[0]
@@ -154,16 +159,21 @@ def _srim(dati, dato, config):
 
     krn = np.array([np.kron(dati[i,:],In1n1) for i in range(nsizS)])
 
+    #def block_3i(df:int)->tuple:
+    #    fi = C1@krn[df-1]
+    #    for nmf in range(df-2):
+    #        fi += CA_powers[df-nmf,:,:]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
+    #    return fi, df
+
     
-    with multiprocessing.Pool(4) as pool:
+    with multiprocessing.Pool(6) as pool:
         for res,df in tqdm(
                 pool.imap_unordered(
-                    partial(block_3,m=m,n1=n1,r=r,CA_powers=CA_powers,C1=C1,krn=krn), 
-                    range(nsizS)),
+                    partial(block_3,CA_powers=CA_powers,m=m,C1=C1,krn=krn),#,out=fi[:,cc-1:dd]),
+                    range(nsizS), 50),
                 total = nsizS
                 ):
             fi[df*m:(df+1)*m,cc-1:dd] = res
-            #res.append(i)
 
 
     #for df in range(nsizS):
@@ -318,10 +328,12 @@ def _srim(dati, dato, config):
 ###%KKKKK
 ##    return freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM
 
-def block_3(df:int, m:int, n1, r, CA_powers, C1, krn):
+def block_3(df:int, CA_powers, m, C1, krn):
+    #fi = out[df*m:(df+1)*m,:]
+    #fi[:,:] = C1@krn[df-1]
     fi = C1@krn[df-1]
     for nmf in range(df-2):
-        fi += CA_powers[df-nmf,:,:]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
+        fi += CA_powers[df-nmf]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
     return fi, df
 
 
