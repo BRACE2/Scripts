@@ -135,7 +135,6 @@ def _srim(dati, dato, config):
         A_p = A1@A_p
         CA_powers[pwr+1,:,:] =  C1@A_p
     #CA_powers = jnp.asarray(CA_powers)
-    CA_powers = CA_powers
 
 
 #
@@ -147,57 +146,33 @@ def _srim(dati, dato, config):
 #
 # Second block column of fi
     Imm = np.eye(m)
-    for df in range(nsizS):
-        fi[df*m:(df+1)*m,n1:n1+m*r] = np.kron(dati[df,:],Imm)
+    for i in range(nsizS):
+        fi[i*m:(i+1)*m,n1:n1+m*r] = np.kron(dati[i,:],Imm)
 
 #
 # Third block column of fi
     In1n1 = np.eye(n1)
     cc = n1+m*r+1
     dd = n1+m*r+n1*r
-    fi3 = np.zeros((nsizS, m, dd-cc+1))
+    #fi3 = np.zeros((nsizS, m, dd-cc+1))
 
     krn = np.array([np.kron(dati[i,:],In1n1) for i in range(nsizS)])
 
-    #def block_3i(df:int)->tuple:
-    #    fi = C1@krn[df-1]
-    #    for nmf in range(df-2):
-    #        fi += CA_powers[df-nmf,:,:]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
-    #    return fi, df
-
-    
     with multiprocessing.Pool(6) as pool:
         for res,df in tqdm(
                 pool.imap_unordered(
                     partial(block_3,CA_powers=CA_powers,m=m,C1=C1,krn=krn),#,out=fi[:,cc-1:dd]),
-                    range(nsizS), 50),
+                    range(nsizS),
+                    200
+                ),
                 total = nsizS
-                ):
+            ):
             fi[df*m:(df+1)*m,cc-1:dd] = res
 
 
-    #for df in range(nsizS):
-    #    #out1, out2, out3 = zip(*pool.map(calc_stuff, range(0, 10 * offset, offset)))
-    #    a = df*m
-    #    b = (df+1)*m
-    #    #fi3[df,:,:] = block_3(df, m, n1, r, CA_powers, C1, krn)
-    #    #fi[a:b,cc-1:dd] = fi3[df, :, :]
-    #    fi[a:b,cc-1:dd] = res[df]
-
-
-
-    #for df in tqdm(range(nsizS)):
-    #    out1, out2, out3 = zip(*pool.map(calc_stuff, range(0, 10 * offset, offset)))
-    #    a = df*m
-    #    b = (df+1)*m
-    #    fi3[df,:,:] = block_3(df, m, n1, r, CA_powers, C1, krn)
-    #    fi[a:b,cc-1:dd] = fi3[df, :, :]
-
-
-#
     dattemp = dato[:nsizS,:].T
     y = dattemp.flatten()
-#
+
     teta = lsqminnorm(fi,y)
 
     x0 = teta[:n1]
@@ -211,7 +186,6 @@ def _srim(dati, dato, config):
     for wq in range(r):
         D[:,wq] = dcol[wq*m:(wq+1)*m]
 
-#
     for ww in range(r):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
@@ -361,6 +335,5 @@ if __name__ == "__main__":
     config_srim.to  = first_input.accel["time_step"]
     config_srim.dn  = npoints
     config_srim.orm =  4
-    #A,B,C,D = _srim(jnp.asarray(inputs), jnp.asarray(outputs), config_srim)
     A,B,C,D = _srim(inputs, outputs, config_srim)
 
