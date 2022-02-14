@@ -2,9 +2,9 @@ function [freqdmp, modeshape, sj1, v, d] = ExtractModes(dt, A, B, C, D)
 n = size(A,1);
 m = size(C,1);
 
-[v d] = eig(A);        %eigenvectors (d) & eiegenvalues (v) of the matrix A
-cnd = condeig(A);      %condeig(A): gives a vector of condition numbers for the eigenvalues of A
-kit = log(diag(d));    %logarithm of the eigenvalues
+[v d] = eig(A);        % eigenvectors (d) & eiegenvalues (v) of the matrix A
+cnd = condeig(A);      % condeig(A): gives a vector of condition numbers for the eigenvalues of A
+kit = log(diag(d));    % logarithm of the eigenvalues
 
 % a) Determination of modal frequencies (Eqs. 3.46 & 3.39)
 sj1 = kit./dt;              %dt is the time step
