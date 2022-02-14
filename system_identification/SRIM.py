@@ -190,6 +190,7 @@ def _srim(dati, dato, config):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
     return A1,B,C1,D
+    #return locals()
 
 #PY
 # #% 2e. Obtain the modal information from the system matrices A & C
@@ -311,23 +312,32 @@ def block_3(df:int, CA_powers, m, C1, krn):
     return fi, df
 
 
+def block_32(df:int, CA_powers, m, C1, krn):
+    #fi = out[df*m:(df+1)*m,:]
+    #fi[:,:] = C1@krn[df-1]
+    fi = C1@krn[df-1]
+    for nmf in range(df-2):
+        fi += CA_powers[df-nmf]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
+    return jax.lax.reduce(
+            (CA_powers,krn,range(df-2)), (C1@krn[df-1], 0),
+            lambda x,y: (x[0]+y[0][df-x[1]], x[1]+1))
 
 if __name__ == "__main__":
     import quakeio
     from pathlib import Path
-    channels = [[1,2,3], [4,5,6]]
+    channels = [[17, 3, 20], [9, 7, 4]]
     data_dir = Path("RioDell_Petrolia_Processed_Data")
-    first_input = quakeio.read(data_dir/f"CHAN00{channels[0][0]}.v2")
+    first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.v2")
     npoints = len(first_input.accel.data)
     inputs, outputs = np.zeros((2,npoints,len(channels[0])))
 
     # Inputs
     inputs[:,0] = first_input.accel.data
     for i,inp in enumerate(channels[0][1:]):
-        inputs[:,i+1] = quakeio.read(data_dir/f"CHAN00{inp}.v2").accel.data
+        inputs[:,i+1] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
     # Outputs
-    for i,inp in enumerate(channels[0]):
-        outputs[:,i] = quakeio.read(data_dir/f"CHAN00{inp}.v2").accel.data
+    for i,inp in enumerate(channels[1]):
+        outputs[:,i] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
 
     class T: pass
     config_srim = T()
@@ -336,4 +346,5 @@ if __name__ == "__main__":
     config_srim.dn  = npoints
     config_srim.orm =  4
     A,B,C,D = _srim(inputs, outputs, config_srim)
+    #loc = _srim(inputs, outputs, config_srim)
 
