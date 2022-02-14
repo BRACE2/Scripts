@@ -3,57 +3,56 @@ from functools import partial
 
 import numpy as np
 from tqdm import tqdm
-import jax
-import jax.numpy as jnp
 
 import os
 # after importing numpy, reset the CPU affinity of the parent process so
 # that it will use all cores
-os.system("taskset -p 0xff %d" % os.getpid())
-
+#os.system("taskset -p 0xff %d" % os.getpid())
 
 linsolve = np.linalg.solve
-lsqminnorm = lambda *args: np.linalg.lstsq(*args, rcond=None)[0]
+lsqminnorm = lambda *args: np.linalg.lstsq(*args, rcond=-1)[0]
 
-def _srim(dati, dato, config):
-#%% Description of the Methodology:
-# More information on SRIM algorithm can be found in Sections 3.4.4 & 3.4.5 of (Arici & Mosalam, 2006).
-# Equations below refer to this report. SRIM is a MIMO SI method that is based on state space identification
-# using least squares and consists of the following steps:
-#
-# 2a. Determine output (y) & input (u) vectors [Eqs. 3.58 & 3.60].
-# 2b. Compute the correlation terms & the coefficient matrix (Eqs. 3.68 & 3.69).
-# 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
-# 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
-# 2e. Obtain the modal information from matrices A, B & C.
-# 2f. Spatial & temporal validation of the identified modes.
-# 2g. Back calculate (estimate) the output accelerations with the state-space system &
-#     check against the actual output accelerations.
-#
-# Notes: Computation of B & D matrices take very long time (not possible to get a result until now)
-# becuase of the excessive matrix operations in lines 944-950. Matrices B & D are not needed for computation of
-# periods, damping ratios, or mode shapes. However, they are needed for part of step 2f and the entire step 2g.
-# Therefore, these steps are not pursued. Relevant compuations are left commented out for now in case we find
-# efficient ways of computing these later.
-#
-# For orm = 2, one mode is found, for orm = 4, two modes are found.
-# For case 1, one mode is transverse & the other is torsion.
-# For all other cases, the second mode is a higher mode.
-# Sometimes higher orm still gives fewer modes, e.g. orm = 8 for case 1 gives
-# three modes, but one of them is invalid according to the EMAC & MPC criteria.
-# same orm in OKID-ERA-DC is used. It can be changed if needed.
-#
-# Important output variables:
-#  1. freqdampSRIM variable is a matrix that includes the information of identified
-#     frequencies, damping ratios & validation of the modes with MPC & EMAC criteria.
-#     Each row of freqdamp corresponds to a mode. Columns are as follows:
-#     1)frequency, 2)damping ratio, 3)order index, 4)condition number, 5)MPC.
-#     If values in columns 5 is > 0.5, identified mode is valid.
-#  2. modeshapeSRIM stores the mode shape information for identified modes.
-#  3. RMSEpredSRIM: root mean square error of the predicted output from
-#     identified parameters with respect to the actual output (currently
-#     commented out).
-#
+def blk_3(i, CA, U):
+    return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
+
+def _srim(dati, dato, config, full=True):
+    """
+    # Description of the Methodology:
+   
+    More information on SRIM algorithm can be found in Sections 3.4.4 & 3.4.5 of
+    (Arici & Mosalam, 2006). Equations below refer to this report. SRIM is a MIMO
+    SI method that is based on state space identification using least squares and
+    consists of the following steps:
+   
+   
+    2a. Determine output (y) & input (u) vectors [Eqs. 3.58 & 3.60].
+    2b. Compute the correlation terms & the coefficient matrix (Eqs. 3.68 & 3.69).
+    2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
+    2d. Use the observability matrix to compute system matrices A, B & C, in which modal 
+        information is embedded.
+    2e. Obtain the modal information from matrices A, B & C.
+    2f. Spatial & temporal validation of the identified modes.
+    2g. Back calculate (estimate) the output accelerations with the state-space system &
+        check against the actual output accelerations.
+   
+    For orm = 2, one mode is found, for orm = 4, two modes are found.
+    For case 1, one mode is transverse & the other is torsion.
+    For all other cases, the second mode is a higher mode.
+    Sometimes higher orm still gives fewer modes, e.g. orm = 8 for case 1 gives
+    three modes, but one of them is invalid according to the EMAC & MPC criteria.
+    same orm in OKID-ERA-DC is used. It can be changed if needed.
+   
+    Important output variables:
+     1. freqdampSRIM variable is a matrix that includes the information of identified
+        frequencies, damping ratios & validation of the modes with MPC & EMAC criteria.
+        Each row of freqdamp corresponds to a mode. Columns are as follows:
+        1)frequency, 2)damping ratio, 3)order index, 4)condition number, 5)MPC.
+        If values in columns 5 is > 0.5, identified mode is valid.
+     2. modeshapeSRIM stores the mode shape information for identified modes.
+     3. RMSEpredSRIM: root mean square error of the predicted output from
+        identified parameters with respect to the actual output (currently
+        commented out).
+    """
 
     dn = config.dn
     to = config.to
@@ -72,10 +71,9 @@ def _srim(dati, dato, config):
     nsizS = dn-1-p+2
 
     l,m = dato.shape
-    _,r = dati.shape
+    _,r = dati.shape # r is the number of input channels (computed with OKID-ERA-DC)
 
-    ypS = np.zeros((r*p,nsizS))     # r is the number of input channels (computed with OKID-ERA-DC)
-#p is the number of steps used for the identification. It is an input parameter of SRIM
+    ypS = np.zeros((r*p,nsizS))     
     upS = np.zeros((r*p,nsizS))
 
 # Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)
@@ -86,38 +84,35 @@ def _srim(dati, dato, config):
 
 #% 2b. Compute the correlation terms and the coefficient matrix (Eqs. 3.68 & 3.69).
 
-# Compute the correlation terms (Eq. 3.68)
+    # Compute the correlation terms (Eq. 3.68)
     Ryy = ypS@ypS.T/nsizS
     Ruu = upS@upS.T/nsizS
     Ruy = upS@ypS.T/nsizS
 
-#Compute the correlation matrix (Eq. 3.69)
-    Rhh = Ryy - Ruy.T*linsolve(Ruu,Ruy)
+    # Compute the correlation matrix (Eq. 3.69)
+    Rhh = Ryy - Ruy.T@linsolve(Ruu,Ruy)
 
-#% 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
-
-# Obtain observability matrix using full or partial decomposition.
-# Full decomposition is used for the rest of the computations.
-# Partial decomposition equations are available. They are commented out.
-
-# Full Decomposition Method
-    un1,*_ = np.linalg.svd(Rhh,0)                  # Eq. 3.74
-    Op1 = un1[:,:n1]                         # Eq. 3.72
+# 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
+#     Obtain observability matrix using full or partial decomposition.
+#     Full decomposition is used for the rest of the computations.
+#     Partial decomposition equations are available. They are commented out.
 
 #% 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
 
 # Determine the system matrices A & C (1 & 2 indicate the ones corresponding
 # to full & partial decomposition, respectively. 2 is commented out)
-    A1 = lsqminnorm(Op1[:(p-1)*m,:], Op1[m:p*m+1,:])
-    #C1 = jnp.asarray(Op1[:m,:])
-    C1 = Op1[:m,:]
-#%KKKKK
-# Partial Decomposition Method
-    un2,*_ = np.linalg.svd(Rhh[:,:(p-1)*m+1],0)
-#A2 = lsqminnorm(Op2(1:(p-1)*m,:), Op2(m+1:p*m,:))
-    Op2 = un2[:,:n1]
-#C2 = Op2(1:m,:)
-#%KKKKK
+    if full:
+        # Full Decomposition Method
+        un,*_ = np.linalg.svd(Rhh,0)            # Eq. 3.74
+        Op = un[:,:n1]                         # Eq. 3.72
+        A = lsqminnorm(Op[:(p-1)*m,:], Op[m:p*m,:])
+        C = Op[:m,:]
+    else:
+        # Partial Decomposition Method
+        un,*_ = np.linalg.svd(Rhh[:,:(p-1)*m+1],0)
+        Op = un[:,:n1]
+        A = lsqminnorm(Op[:(p-1)*m,:], Op[m:p*m,:])
+        C = un[:m,:]
 
 
 # Computation of system matrices B & D
@@ -125,55 +120,48 @@ def _srim(dati, dato, config):
 # because of excessive computation time
 
 # Output Error Minimization
-# Setting up the fi matrix
+# Setting up the Phi matrix
 #%KKKKK
-    fi  = np.zeros((m*nsizS, n1+m*r+n1*r))
-    A_p = A1
-    CA_powers = np.zeros((1+nsizS, m, A1.shape[1]))
-    CA_powers[0, :, :] = C1@A_p
-    for pwr in range(nsizS):
-        A_p = A1@A_p
-        CA_powers[pwr+1,:,:] =  C1@A_p
-    #CA_powers = jnp.asarray(CA_powers)
+    Phi  = np.zeros((m*nsizS, n1+m*r+n1*r))
+    CA_powers = np.zeros((nsizS, m, A.shape[1]))
+    CA_powers[0, :, :] = C
+    A_p = A
+    for pwr in range(1,nsizS):
+        CA_powers[pwr,:,:] =  C@A_p
+        A_p = A@A_p
 
+    # First block column of Phi
+    for df in range(nsizS):
+        Phi[df*m:(df+1)*m,:n1] = CA_powers[df,:,:]
 
-#
-# First block column of fi
-    fi[:m,:n1] = C1
-    for df in range(1,nsizS):
-        fi[df*m:(df+1)*m,:n1] = CA_powers[df-1,:,:]
-
-#
-# Second block column of fi
+    # Second block column of Phi
     Imm = np.eye(m)
     for i in range(nsizS):
-        fi[i*m:(i+1)*m,n1:n1+m*r] = np.kron(dati[i,:],Imm)
+        Phi[i*m:(i+1)*m,n1:n1+m*r] = np.kron(dati[i,:],Imm)
 
-#
-# Third block column of fi
+    # Third block column of Phi
     In1n1 = np.eye(n1)
-    cc = n1+m*r+1
+    cc = n1+m*r + 1
     dd = n1+m*r+n1*r
-    #fi3 = np.zeros((nsizS, m, dd-cc+1))
 
     krn = np.array([np.kron(dati[i,:],In1n1) for i in range(nsizS)])
 
     with multiprocessing.Pool(6) as pool:
-        for res,df in tqdm(
+        for i,res in tqdm(
                 pool.imap_unordered(
-                    partial(block_3,CA_powers=CA_powers,m=m,C1=C1,krn=krn),#,out=fi[:,cc-1:dd]),
-                    range(nsizS),
+                    partial(blk_3,CA=CA_powers,U=np.flip(krn,0)),
+                    range(1,nsizS),
                     200
                 ),
                 total = nsizS
             ):
-            fi[df*m:(df+1)*m,cc-1:dd] = res
+            Phi[i*m:(i+1)*m,cc-1:dd] = res
 
 
     dattemp = dato[:nsizS,:].T
     y = dattemp.flatten()
 
-    teta = lsqminnorm(fi,y)
+    teta = lsqminnorm(Phi,y)
 
     x0 = teta[:n1]
     dcol = teta[n1:n1+m*r]
@@ -189,13 +177,13 @@ def _srim(dati, dato, config):
     for ww in range(r):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
-    return A1,B,C1,D
-    #return locals()
+    #return A,B,C,D
+    return locals()
 
 #PY
 # #% 2e. Obtain the modal information from the system matrices A & C
 # # This includes determination of: a) modal frequencies, b) damping ratios & c) mode shapes
-#     freqdmpSRIM, modeshapeSRIM, sj1S, vS = ExtractModes(dt, A1, B, C1, D)
+#     freqdmpSRIM, modeshapeSRIM, sj1S, vS = ExtractModes(dt, A, B, C1, D)
 # # c) Determination of mode shapes
 #     mod = C1@vS                 # mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
 # 
@@ -303,25 +291,6 @@ def _srim(dati, dato, config):
 ###%KKKKK
 ##    return freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM
 
-def block_3(df:int, CA_powers, m, C1, krn):
-    #fi = out[df*m:(df+1)*m,:]
-    #fi[:,:] = C1@krn[df-1]
-    fi = C1@krn[df-1]
-    for nmf in range(df-2):
-        fi += CA_powers[df-nmf]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
-    return fi, df
-
-
-def block_32(df:int, CA_powers, m, C1, krn):
-    #fi = out[df*m:(df+1)*m,:]
-    #fi[:,:] = C1@krn[df-1]
-    fi = C1@krn[df-1]
-    for nmf in range(df-2):
-        fi += CA_powers[df-nmf]@krn[nmf] #np.kron(dati[nmf,:],In1n1)
-    return jax.lax.reduce(
-            (CA_powers,krn,range(df-2)), (C1@krn[df-1], 0),
-            lambda x,y: (x[0]+y[0][df-x[1]], x[1]+1))
-
 if __name__ == "__main__":
     import quakeio
     from pathlib import Path
@@ -343,8 +312,9 @@ if __name__ == "__main__":
     config_srim = T()
     config_srim.p   =  5
     config_srim.to  = first_input.accel["time_step"]
-    config_srim.dn  = npoints
+    config_srim.dn  = npoints - 1
     config_srim.orm =  4
-    A,B,C,D = _srim(inputs, outputs, config_srim)
-    #loc = _srim(inputs, outputs, config_srim)
+    #A,B,C,D = _srim(inputs, outputs, config_srim)
+    loc = _srim(inputs[:-1], outputs[:-1], config_srim)
+
 
