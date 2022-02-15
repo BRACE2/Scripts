@@ -2,6 +2,7 @@ import multiprocessing
 from functools import partial
 
 import numpy as np
+import scipy.linalg
 from tqdm import tqdm
 
 import os
@@ -10,7 +11,7 @@ import os
 #os.system("taskset -p 0xff %d" % os.getpid())
 
 linsolve = np.linalg.solve
-lsqminnorm = lambda *args: np.linalg.lstsq(*args, rcond=-1)[0]
+lsqminnorm = lambda *args: scipy.linalg.lstsq(*args)[0]
 
 def blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
@@ -158,10 +159,10 @@ def _srim(dati, dato, config, full=True):
             Phi[i*m:(i+1)*m,cc-1:dd] = res
 
 
-    dattemp = dato[:nsizS,:].T
+    dattemp = dato[:nsizS,:]
     y = dattemp.flatten()
 
-    teta = lsqminnorm(Phi,y)
+    teta = lsqminnorm(Phi,y,1e-8)
 
     x0 = teta[:n1]
     dcol = teta[n1:n1+m*r]
