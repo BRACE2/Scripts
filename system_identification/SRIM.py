@@ -2,7 +2,6 @@ import multiprocessing
 from functools import partial
 
 import numpy as np
-import scipy.linalg
 from tqdm import tqdm
 
 import os
@@ -11,7 +10,7 @@ import os
 #os.system("taskset -p 0xff %d" % os.getpid())
 
 linsolve = np.linalg.solve
-lsqminnorm = lambda *args: scipy.linalg.lstsq(*args)[0]
+lsqminnorm = lambda *args: np.linalg.lstsq(*args,rcond=None)[0]
 
 def blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
@@ -62,28 +61,31 @@ def _srim(dati, dato, config, full=True):
     n1 = config.orm       # Order of the model. # of computed and plotted modes depend on orm.
 
 
-#% 2a. Compute y (output) and u (input) vectors (Eqs. 3.58 & 3.60)
+    # 2a. Compute y (output) and u (input) vectors (Eqs. 3.58 & 3.60)
 
-# Note that main Step 2 develops Eq. 3.57. Therefore, it is not part of the code.
-# Accordingly, the code continues with Step 2a to compute the output & input vectors.
+    # Note that main Step 2 develops Eq. 3.57.
+    # Therefore, it is not part of the code.
+    # Accordingly, the code continues with Step 2a to compute the output & input vectors.
 
-# Calculate the usable size of the data matrix
-#dn = size(dat,1)/div;       % total # time steps after decimating
+    # Calculate the usable size of the data matrix
+    #dn = size(dat,1)/div;       # total # time steps after decimating
     nsizS = dn-1-p+2
+    n = n1
 
     l,m = dato.shape
-    _,r = dati.shape # r is the number of input channels (computed with OKID-ERA-DC)
+    _,r = dati.shape # r is the number of input channels
 
     ypS = np.zeros((r*p,nsizS))     
     upS = np.zeros((r*p,nsizS))
 
-# Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)
+    # Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)
     for b in range(p):
         ypS[b*m:(b+1)*m,:nsizS+1] = dato[b:nsizS+b, :].T
         upS[b*r:(b+1)*r,:nsizS+1] = dati[b:nsizS+b, :].T
 
 
-#% 2b. Compute the correlation terms and the coefficient matrix (Eqs. 3.68 & 3.69).
+    # 2b. Compute the correlation terms and the coefficient matrix 
+    #     (Eqs. 3.68 & 3.69).
 
     # Compute the correlation terms (Eq. 3.68)
     Ryy = ypS@ypS.T/nsizS
@@ -93,18 +95,18 @@ def _srim(dati, dato, config, full=True):
     # Compute the correlation matrix (Eq. 3.69)
     Rhh = Ryy - Ruy.T@linsolve(Ruu,Ruy)
 
-# 2c. Obtain observability matrix using full or partial decomposition (Eqs. 3.72 & 3.74).
-#     Obtain observability matrix using full or partial decomposition.
-#     Full decomposition is used for the rest of the computations.
-#     Partial decomposition equations are available. They are commented out.
+    # 2c. Obtain observability matrix using full or partial decomposition 
+    #     (Eqs. 3.72 & 3.74).
+    
+    # 2d. Use the observability matrix to compute system matrices A, B & C, 
+    #     in which modal information is embedded.
 
-#% 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
-
-# Determine the system matrices A & C (1 & 2 indicate the ones corresponding
-# to full & partial decomposition, respectively. 2 is commented out)
+    #
+    # Determine the system matrices A & C
+    #
     if full:
         # Full Decomposition Method
-        un,*_ = np.linalg.svd(Rhh,0)            # Eq. 3.74
+        un,*_ = np.linalg.svd(Rhh,0)           # Eq. 3.74
         Op = un[:,:n1]                         # Eq. 3.72
         A = lsqminnorm(Op[:(p-1)*m,:], Op[m:p*m,:])
         C = Op[:m,:]
@@ -116,13 +118,10 @@ def _srim(dati, dato, config, full=True):
         C = un[:m,:]
 
 
-# Computation of system matrices B & D
-# Note that these computations are commented out as it is not possible to compute B & D
-# because of excessive computation time
+    # Computation of system matrices B & D
+    # Output Error Minimization
 
-# Output Error Minimization
-# Setting up the Phi matrix
-#%KKKKK
+    # Setting up the Phi matrix
     Phi  = np.zeros((m*nsizS, n1+m*r+n1*r))
     CA_powers = np.zeros((nsizS, m, A.shape[1]))
     CA_powers[0, :, :] = C
@@ -158,20 +157,16 @@ def _srim(dati, dato, config, full=True):
             ):
             Phi[i*m:(i+1)*m,cc-1:dd] = res
 
+    y = dato[:nsizS,:].flatten()
 
-    dattemp = dato[:nsizS,:]
-    y = dattemp.flatten()
-
-    teta = lsqminnorm(Phi,y,1e-8)
+    teta = lsqminnorm(Phi,y)
 
     x0 = teta[:n1]
     dcol = teta[n1:n1+m*r]
     bcol = teta[n1+m*r:n1+m*r+n1*r]
-#
-    n = n1
+
     D = np.zeros((m,r))
     B = np.zeros((n,r))
-# Obtain D
     for wq in range(r):
         D[:,wq] = dcol[wq*m:(wq+1)*m]
 
