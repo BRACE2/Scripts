@@ -59,24 +59,14 @@ def ExtractModes(dt, A, B, C, D):
 
     # b) Determination of damping ratios (Eqs. 3.46 & 3.39)
     damp1 = -((real(sj1))/(2*pi*freq1))
-    #freq2 = freq1.flatten()
     # Represent the identified frequency & damping information
     # of the proper roots in a matrix
     freqdmp = np.array([
                [freq1[lk],   # first column: identified frequency
                 damp1[lk],   # second column: identified damping ratio
-               #lk       ,   # third column: model order index (1:n)
                 cnd[lk]]     # condition number of the eigenvalue
             for lk in roots
     ])
-#    for lk in range(0,n,2):              # from 1 to the model order, n
-#        if freq1[lk,1] == 1:             # 1 indicates that it is a proper root
-#            freqdmp.append([freq1[lk],   # first column: identified frequency
-#                            damp1[lk],   # second column: identified damping ratio
-#                            lk       ,   # third column: model order index (1:n)
-#                            cnd[lk]])    # condition number of the eigenvalue
-
-#    freqdmp = np.array(freqdmp)
 
     # c) Determination of mode shapes
     modes_raw = C@v   # mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
@@ -91,8 +81,9 @@ def ExtractModes(dt, A, B, C, D):
 
     for q,root in enumerate(roots):
         om  = np.argmax(abs(real(modeshape[:,q])))
-        mit = abs(real(modeshape[om,q]))
-        modeshape[:,q] = real(modeshape[:,q])/mit*sign(real(modeshape[om,q]))
+        mx  = abs(real(modeshape[om,q]))
+        modeshape[:,q] = real(modeshape[:,q])/mx*sign(real(modeshape[om,q]))
 
     return freqdmp, modeshape, sj1, v, d
+
 
