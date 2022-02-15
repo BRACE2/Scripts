@@ -176,7 +176,6 @@ def _srim(dati, dato, config, full=True):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
     return A,B,C,D
-    #return locals()
 
 #PY
 # #% 2e. Obtain the modal information from the system matrices A & C
@@ -289,23 +288,42 @@ def _srim(dati, dato, config, full=True):
 ##    return freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM
 
 if __name__ == "__main__":
+    import sys
     import quakeio
     from pathlib import Path
     channels = [[17, 3, 20], [9, 7, 4]]
-    data_dir = Path("RioDell_Petrolia_Processed_Data")
-    first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.v2")
-    npoints = len(first_input.accel.data)
-    inputs, outputs = np.zeros((2,npoints,len(channels[0])))
 
-    # Inputs
-    inputs[:,0] = first_input.accel.data
-    for i,inp in enumerate(channels[0][1:]):
-        inputs[:,i+1] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
-    # Outputs
-    for i,inp in enumerate(channels[1]):
-        outputs[:,i] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
+    if len(sys.argv) < 2:
+        data_dir = Path("RioDell_Petrolia_Processed_Data")
 
-    dt = first_input.accel["time_step"]
+        first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.v2")
+        npoints = len(first_input.accel.data)
+        inputs, outputs = np.zeros((2,npoints,len(channels[0])))
+
+        # Inputs
+        inputs[:,0] = first_input.accel.data
+        for i,inp in enumerate(channels[0][1:]):
+            inputs[:,i+1] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
+
+        # Outputs
+        for i,inp in enumerate(channels[1]):
+            outputs[:,i] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
+
+        dt = first_input.accel["time_step"]
+
+    else:
+        event = quakeio.read(sys.argv[-1])
+        inputs = np.array([
+            event.at(file_name=f"CHAN{i:03d}.V2").accel.data for i in channels[0]
+        ]).T
+        outputs = np.array([
+            event.at(file_name=f"CHAN{i:03d}.V2").accel.data for i in channels[1]
+        ]).T
+        npoints = len(inputs[:,0])
+        dt = event.at(file_name=f"CHAN{channels[0][0]:03d}.V2").accel["time_step"]
+
+
+
 
     class T: pass
     config_srim = T()
@@ -314,8 +332,7 @@ if __name__ == "__main__":
     config_srim.dn  = npoints - 1
     config_srim.orm =  4
     A,B,C,D = _srim(inputs, outputs, config_srim)
-    #loc = _srim(inputs[:-1], outputs[:-1], config_srim)
-    freqdmpSRIM, modeshapeSRIM, sj1S, vS, _ = ExtractModes(dt, A, B, C, D)
-    print(freqdmpSRIM)
+    freqdmpSRIM, modeshapeSRIM, *_ = ExtractModes(dt, A, B, C, D)
+    print(1/freqdmpSRIM[:,0])
 
 
