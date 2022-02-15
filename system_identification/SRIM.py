@@ -4,6 +4,8 @@ from functools import partial
 import numpy as np
 from tqdm import tqdm
 
+from ExtractModes import *
+
 import os
 # after importing numpy, reset the CPU affinity of the parent process so
 # that it will use all cores
@@ -173,13 +175,12 @@ def _srim(dati, dato, config, full=True):
     for ww in range(r):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
-    #return A,B,C,D
-    return locals()
+    return A,B,C,D
+    #return locals()
 
 #PY
 # #% 2e. Obtain the modal information from the system matrices A & C
 # # This includes determination of: a) modal frequencies, b) damping ratios & c) mode shapes
-#     freqdmpSRIM, modeshapeSRIM, sj1S, vS = ExtractModes(dt, A, B, C1, D)
 # # c) Determination of mode shapes
 #     mod = C1@vS                 # mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
 # 
@@ -304,13 +305,17 @@ if __name__ == "__main__":
     for i,inp in enumerate(channels[1]):
         outputs[:,i] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
 
+    dt = first_input.accel["time_step"]
+
     class T: pass
     config_srim = T()
     config_srim.p   =  5
-    config_srim.to  = first_input.accel["time_step"]
+    config_srim.to  = dt
     config_srim.dn  = npoints - 1
     config_srim.orm =  4
-    #A,B,C,D = _srim(inputs, outputs, config_srim)
-    loc = _srim(inputs[:-1], outputs[:-1], config_srim)
+    A,B,C,D = _srim(inputs, outputs, config_srim)
+    #loc = _srim(inputs[:-1], outputs[:-1], config_srim)
+    freqdmpSRIM, modeshapeSRIM, sj1S, vS, _ = ExtractModes(dt, A, B, C, D)
+    print(freqdmpSRIM)
 
 
