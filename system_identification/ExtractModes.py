@@ -52,7 +52,7 @@ def ExtractModes(dt, A, B, C, D):
     if freq1[n-1] == freq1[n-2]:
         roots.append(n-1)
 
-    for hw in range(1, n-1):
+    for hw in range(2, n-2):
         if (freq1[hw] == freq1[hw+1]) or (freq1[hw] == freq1[hw-1]):
             roots.append(hw)
  
@@ -71,9 +71,7 @@ def ExtractModes(dt, A, B, C, D):
     # c) Determination of mode shapes
     modes_raw = C@v   # mode shapes (Eq. 3.40), v is the eigenvectors of matrix A
 
-    #kss = freqdmp.shape[0]
     modeshape = np.zeros((m,len(roots)), dtype=complex)
-    #print(modes_raw)
 
     # extract mode shapes from mod corresponding to a frequency
     for q,root in enumerate(roots):
