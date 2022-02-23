@@ -9,9 +9,9 @@ import numpy as np
 
 from opensees import section, patch, layer
 import opensees.render.mpl as render
-import elle.units
 
-inch = ksi_psi = fce = ec0 = esp = Ec = Gc = Esh = fu = esh = esu = 1.0
+
+inch = ksi_psi = fce = ec0 = esp = Ec = Gc = Esh = fu = 1.0
 
 #
 # Geometry Building
@@ -30,6 +30,7 @@ def GirderSection(units="english_engineering"):
     #
     #             |                                     |
 
+    import elle.units
     units = elle.units.UnitHandler("english_engineering")
     ft, inch, spacing = units.ft, units.inch, units.spacing
 
