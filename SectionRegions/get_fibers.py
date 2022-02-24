@@ -1,28 +1,26 @@
 import json, sys, fnmatch
 
-from SectionLib import Octagon
+from opensees.section import PatchOctagon as Octagon
 
 
-def iter_elem_fibers(elements:list, model:dict, damage_state:dict=None):
+def iter_elem_fibers(model:dict, elements:list, damage_state:dict=None):
+    sam = model["StructuralAnalysisModel"]
     model["sections"] = {
-        str(s["name"]): s 
-        for s in model["StructuralAnalysisModel"]["properties"]["sections"]
+        str(s["name"]): s for s in sam["properties"]["sections"]
     }
     model["materials"] = {
-        str(m["name"]): m
-        for m in model["StructuralAnalysisModel"]["properties"]["uniaxialMaterials"]
+        str(m["name"]): m for m in sam["properties"]["uniaxialMaterials"]
     }
-    for el in model["StructuralAnalysisModel"]["geometry"]["elements"]:
+    for el in sam["geometry"]["elements"]:
         if el["name"] in elements and "sections" in el:
-            #elem_cmd = base_cmd + f"-ele {el['name']} "
             for tag in el["sections"]:
                 s = model["sections"][tag]
                 if "section" in s:
                     s = model["sections"][s["section"]]
-                    for s,f in iter_section_fibers(s, model, damage_state):
+                    for s,f in iter_section_fibers(model, s, damage_state):
                         yield el,s,f
 
-def iter_section_fibers(s, model, damage_state):
+def iter_section_fibers(model, s, damage_state=None):
     if damage_state is not None:
         if "material" not in damage_state:
             damage_state["material"] = "*"
@@ -43,11 +41,9 @@ def print_fiber(c, base_cmd):
     fiber_cmd = base_cmd + f"fiber {c[0]} {c[1]} stressStrain;\n"
     print(fiber_cmd)
 
-
-
 def print_help():
     print("""
-    FiberLib model.json output.txt -d Dcol -e E... -s STATE
+    get_fibers model.json output.txt -d Dcol -e E... -s STATE
 """)
 
 def parse_args(args)->dict:
@@ -71,27 +67,32 @@ def parse_args(args)->dict:
             opts["record_file"] = arg
     return opts
 
-
-
 base_cmd = "recorder Element -xml {out_file} -time " 
 
+# --8<--------------------------------------------------------
 def damage_states(Dcol):
     cover = 2.0
     return {
-      # Any outermost cover fiber
       "dsr1" : {
-          "regions": [Octagon(Dcol/2, Dcol/2)]
+          "regions": [
+              Octagon(Rcol, Rcol)
+          ]
       },
       "dsr2" : {
-          "regions": [Octagon(Dcol/2.1, Dcol/2.2)],
+          "regions": [
+              section.FiberSection(fibers=[
+                  patch.circ(intRad=Rcol-cover-2, extRad=Rcol-cover)
+              ])
+          ],
           "material": "*steel*"
       },
-      # Any cover fiber at 1/2 - 3/4 cover depth
       "dsr3" : {
-          #         internal radius         external radius
-          "regions": [Octagon(Dcol/2-cover*(1-0.5), Dcol/2-cover*(1-0.75))],
-      },
-    }
+          "regions": [
+          #             external radius      internal radius
+              Octagon(Rcol-cover*(1-0.75), Rcol-cover*(1-0.5))
+          ]
+      }
+}
 
 if __name__=="__main__":
 
@@ -107,11 +108,7 @@ if __name__=="__main__":
     with open(opts["model_file"], "r") as f:
         model = json.load(f)
 
-    for e,s,f in iter_elem_fibers(elements, model, damage_state):
+    for e,s,f in iter_elem_fibers(model, elements, damage_state):
         elem_cmd = base_cmd + f"-ele {e['name']} "
         print_fiber(f["coord"], elem_cmd + f"section {s['name']} ")
-
-
-
-
 

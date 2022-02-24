@@ -55,13 +55,14 @@ usage: {NAME} <sam-file>
        {NAME} --install
        {NAME} [options] <sam-file>
        {NAME} [options] <sam-file> <res-file>
+       {NAME} --section <py-file>#<py-object>
 
 Generate a plot of a structural model.
 
 Positional Arguments:
   <sam-file>                     JSON file defining the structural model.
   <res-file>                     JSON or YAML file defining a structural
-                                   response.
+                                 response.
 
 Options:
   -s, --scale  <scale>           Set displacement scale factor.
@@ -135,7 +136,7 @@ Config = lambda : {
       "origin": {"color": "black"},
 
       "frames" : {
-          "color": "#000000",
+          "default": "#000000",
           "displaced": {"color": "red", "npoints": 20}
       },
 
@@ -157,7 +158,6 @@ Config = lambda : {
 
 def apply_config(conf, opts):
     for k,v in conf.items():
-        print(k,v)
         if isinstance(v,dict):
             apply_conf(v, opts[k])
         else:
@@ -184,6 +184,7 @@ try:
     FLOAT = np.float32
     from scipy.linalg import block_diag
 except:
+    # prevent undefined variables when run in install mode
     yaml = None
     Array = list
     FLOAT =  float
@@ -312,7 +313,6 @@ def displaced_profile(
     plan_curve = elastic_curve(xaxis, plan_dofs(v), Lnew)
     elev_curve = elastic_curve(xaxis, elev_dofs(v), Lnew)
 
-    #dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
     dx,dy,dz = Q@np.linspace(displ[:3], displ[6:9], n).T
     local_curve = np.stack([xaxis+dx[0], plan_curve+dy, elev_curve+dz])
 
@@ -352,13 +352,13 @@ def set_axis_limits(ax):
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
 
-def plot_skeletal(frame, axes=None):
+def plot_skeletal(frame, axes=None, conf=None):
     if axes is None: axes = [0,2,1]
-    props = {"frame": {"color": "grey", "alpha": 0.6}}
+    props = conf or {"color": "grey", "alpha": 0.6, "linewidth": 0.5}
     ax = new_3d_axis()
     for e in frame["elems"].values():
         x,y,z = e["crd"].T[axes]
-        ax.plot(x,y,z, **props["frame"])
+        ax.plot(x,y,z, **props)
     return ax
 
 
@@ -381,7 +381,7 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     return ax
 
 def plot_displ(frame:dict, res:dict, ax=None, axes=None):
-    props = {"color": "#660505"}
+    props = {"color": "#660505", "linewidth": 0.5}
     ax = ax or new_3d_axis()
     if axes is None: axes = [0,2,1]
     for el in frame["elems"].values():
@@ -403,6 +403,96 @@ class Plotter:
         if axes is None: axes = [0,2,1]
         self.axes = axes
         self.opts = opts
+
+class MplPlotter(Plotter):
+    def __init__(self, **kwds):
+        pass
+    def get_section_layers(self, section):
+        import matplotlib.collections
+        import matplotlib.lines as lines
+        collection = []
+        for layer in section.layers:
+            if hasattr(layer, "plot_opts"):
+                options = layer.plot_opts
+            else:
+                options = dict(linestyle="--", color="k")
+            collection.append(
+                lines.Line2D(*np.asarray(layer.vertices).T, **options))
+        return collection
+
+    def get_section_patches(self, section):
+        import matplotlib.collections
+        import matplotlib.patches as mplp
+        collection = []
+        for patch in section.patches:
+            name = patch.__class__.__name__.lower()
+            if "circ" in name:
+                if patch.intRad:
+                    width = patch.extRad - patch.intRad
+                    collection.append(mplp.Annulus(patch.center, patch.extRad, width))
+                else:
+                    collection.append(mplp.Circle(patch.center, patch.extRad))
+            else:
+                collection.append(mplp.Polygon(patch.vertices))
+        return matplotlib.collections.PatchCollection(
+            collection,
+            facecolor="grey",
+            edgecolor="grey",
+            alpha=0.3
+        )
+
+    def plot_section(self,
+        section,
+        show_properties=False,
+        plain=True,
+        show_quad=True,
+        show_dims=True,
+        annotate=True,
+        ax = None,
+        fig = None,
+        **kwds
+    ):
+        """Plot a composite cross section."""    
+        import matplotlib.pyplot as plt
+        if plain:
+            show_properties = show_quad = show_dims = False
+
+        if show_properties:
+            fig = plt.figure(constrained_layout=True)
+            gs = fig.add_gridspec(1,5)
+            axp = fig.add_subplot(gs[0,3:-1])
+            label = "\n".join(["${}$:\t\t{:0.4}".format(k,v) for k,v in self.properties().items()])
+            axp.annotate(label, (0.1, 0.5), xycoords='axes fraction', va='center')
+            axp.set_autoscale_on(True)
+            axp.axis("off")
+
+            ax = fig.add_subplot(gs[0,:3])
+        else:
+            fig, ax = plt.subplots()
+
+        if ax is None:
+            fig, ax = plt.subplots()
+        ax.set_autoscale_on(True)
+        ax.set_aspect(1)
+
+        #x_max = 1.01 * max(v[0] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+        #y_max = 1.05 * max(v[1] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+        #y_min = 1.05 * min(v[1] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+
+        #ax.set_xlim(-x_max, x_max)
+        #ax.set_ylim( y_min, y_max)
+        ax.axis("off")
+        # add shapes
+        ax.add_collection(self.get_section_patches(section,**kwds))
+        for l in self.get_section_layers(section):
+            ax.add_line(l)
+        # show centroid
+        #ax.scatter(*section.centroid)
+        # show origin
+        ax.scatter(0, 0)
+        plt.show()
+        
+        return fig, ax
 
 class GnuPlotter(Plotter):
     def plot_frames(self):
@@ -642,7 +732,9 @@ def install_me(install_opt=None):
     import os
     import subprocess
     if install_opt == "dependencies":
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", *REQUIREMENTS.strip().split("\n")
+        ])
         sys.exit()
     try:
         from setuptools import setup
@@ -652,14 +744,14 @@ def install_me(install_opt=None):
     sys.argv = sys.argv[:1] + ["develop", "--user"]
     print(sys.argv)
 
-    setup(name='render',
-          version='0.0.1',
-          description='',
+    setup(name="render",
+          version="0.0.1",
+          description="",
           long_description=HELP,
-          author='', author_email='', url='',
-          py_modules=['render'],
-          scripts=['render.py'],
-          license='',
+          author="", author_email="", url="",
+          py_modules=["render"],
+          scripts=["render.py"],
+          license="",
           install_requires=[*REQUIREMENTS.strip().split("\n")],
     )
 
@@ -670,13 +762,8 @@ TESTS = [
     (True, "{NAME} sam.json -d 5:2,3:2,2:2 -s100 --axes 2 sam.json")
 ]
 
-# Main script
-#----------------------------------------------------
-# The following code is only executed when the file
-# is invoked as a script.
 
 def render(sam_file, res_file=None, **opts):
-
     if sam_file is None:
         raise RenderError("ERROR -- expected positional argument <sam-file>")
 
@@ -747,12 +834,32 @@ def render(sam_file, res_file=None, **opts):
         plt.show()
     return ax
 
+# Main script
+#----------------------------------------------------
+# The following code is only executed when the file
+# is invoked as a script.
+
 if __name__ == "__main__":
     opts = parse_args(sys.argv)
-    try:
-        render(**opts)
-    except (FileNotFoundError,RenderError) as e:
-        print(e, file=sys.stderr)
-        print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
-        sys.exit()
+    if "json" in opts["sam_file"]:
+        # Plot structural model
+        try:
+            render(**opts)
+        except (FileNotFoundError,RenderError) as e:
+            print(e, file=sys.stderr)
+            print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
+            sys.exit()
+    else:
+        # Plot a cross section
+        from urllib.parse import urlparse
+        file = urlparse(opts["sam_file"])
+        with open(file.path, "r") as f:
+            script = f.read()
+        scope = {}
+        exec(script, scope)
+        plt = MplPlotter()
+        plt.plot_section(scope[file.fragment])
+
+
+
 
