@@ -170,30 +170,6 @@ def Octagon(
     return sect 
 
 def oct_outline(Rcol):
-    # region = []
-    # numSlices     =  8    # # slices in each of the 8 sections of the octagon
-    # numSubdivIJ   =  1    # # fibers in the circumferential direction of the cover patch
-    # # numSubdivJK   =  2    # # fibers in the radial direction of the cover patch
-    # # Dcol = 2*Rcol
-    # # radius to corner
-    # # RcolDiag  =  Dcol*sqrt(4.+2.*sqrt(2.))/(2.+2.*sqrt(2.))
-    # for i in range(8):    # For each of the 8 sections of the octagon
-    #     phi =  pi/4/numSlices
-    #     startAngle =  i*pi/4 - pi/8
-    #     for j in range(numSlices):
-    #         sita1  =  startAngle + j*phi   # Slice start angle
-    #         sita2  =  sita1 +  phi         # Slice end angle
-    #         oR1    =  Rcol/cos(pi/8 -  j*phi)
-    #         oR2    =  Rcol/cos(pi/8 - (j+1)*phi)
-    #         # Cover Patch connects the circular core to the octagonal cover
-    #         region.append(
-    #           layer.line(
-    #             None, numSubdivIJ,
-    #             vertices = [
-    #               [oR1*cos(sita1),   oR1*sin(sita1)],
-    #               [oR2*cos(sita2),   oR2*sin(sita2)]
-    #             ]
-    #         ))
     n = 8
     phi =  2*pi/n
     R = Rcol/cos(phi/2)
