@@ -47,7 +47,6 @@ def install_me(install_opt=None):
         from distutils.core import setup
 
     sys.argv = sys.argv[:1] + sys.argv[2:]
-    # print(sys.argv)
 
     setup(name = "ssid",
           version = "0.0.1",
@@ -197,13 +196,15 @@ def srim(
     p = config.get("p", 5)         # # steps used for the identification. Referred to as the prediction horizon in literature
     n = n1 = config.get("orm", 4)  # Order of the model.
 
-    if hasattr(dati, "data"):
+    if issubclass(dati.__class__, dict):
         dati = dati.data
-    if hasattr(dato, "data"):
+    if issubclass(dato.__class__, dict):
         dato = dato.data
 
-    dati = np.atleast_2d(dati).T
-    dato = np.atleast_2d(dato).T
+    if len(dati.shape) < 2:
+        dati = np.atleast_2d(dati).T
+    if len(dato.shape) < 2:
+        dato = np.atleast_2d(dato).T
 
 
     dn = config.get("dn", None) or len(dati)
@@ -215,16 +216,16 @@ def srim(
     # Accordingly, the code continues with Step 2a to compute the output & input vectors.
 
     # Calculate the usable size of the data matrix
-    #dn = size(dat,1)/div;       # total # time steps after decimating
+    # dn = size(dat,1)/div;       # total # time steps after decimating
     nsizS = dn-1-p+2
 
-    l,m = dato.shape
+    l,m = dato.shape # m is the number of output channels
     _,r = dati.shape # r is the number of input channels
 
-    ypS = np.zeros((r*p,nsizS))     
+    ypS = np.zeros((m*p,nsizS))
     upS = np.zeros((r*p,nsizS))
 
-    # Compute y (output) & u (input) vectors (Eqs. 3.58 & 3.60)
+    # Compute Y (output) & U (input) vectors (Eqs. 3.58 & 3.60 Arici 2006)
     for b in range(p):
         ypS[b*m:(b+1)*m,:nsizS+1] = dato[b:nsizS+b, :].T
         upS[b*r:(b+1)*r,:nsizS+1] = dati[b:nsizS+b, :].T
@@ -466,11 +467,12 @@ if __name__ == "__main__":
     configsrim = {
         "p"  :  5,
         "dt" : dt,
-        "dn" : npoints - 1,
+        #"dn" : npoints - 1,
         "orm":  4
     }
+    print(inputs.__class__)
     A,B,C,D = srim(inputs, outputs, **configsrim)
-    freqdmpSRIM, modeshapeSRIM, *_ = ExtractModes(dt, A, B, C, D)
+    freqdmpSRIM, modeshapeSRIM, *_ = ComposeModes(dt, A, B, C, D)
     print(1/freqdmpSRIM[:,0])
 
 
