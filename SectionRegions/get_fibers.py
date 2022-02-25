@@ -1,5 +1,5 @@
 import json, sys, fnmatch
-
+from opensees import patch, section
 from opensees.section import PatchOctagon as Octagon
 
 
@@ -67,11 +67,12 @@ def parse_args(args)->dict:
             opts["record_file"] = arg
     return opts
 
-base_cmd = "recorder Element -xml {out_file} -time " 
+base_cmd = "recorder Element -xml {out_file} -time "
 
 # --8<--------------------------------------------------------
 def damage_states(Dcol):
     cover = 2.0
+    Rcol = Dcol/2
     return {
       "dsr1" : {
           "regions": [
