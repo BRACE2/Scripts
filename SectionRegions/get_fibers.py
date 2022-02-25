@@ -3,7 +3,7 @@ from opensees import patch, section
 from opensees.section import PatchOctagon as Octagon
 
 
-def iter_elem_fibers(model:dict, elements:list, damage_state:dict=None):
+def iter_elem_fibers(model:dict, elements:list, sections: list, damage_state:dict=None):
     sam = model["StructuralAnalysisModel"]
     model["sections"] = {
         str(s["name"]): s for s in sam["properties"]["sections"]
@@ -13,12 +13,15 @@ def iter_elem_fibers(model:dict, elements:list, damage_state:dict=None):
     }
     for el in sam["geometry"]["elements"]:
         if el["name"] in elements and "sections" in el:
-            for tag in el["sections"]:
+            #for tag in el["sections"]:
+            for i in sections:
+                idx = len(el["sections"]) - 1 if i==-1 else i
+                tag = el["sections"][idx]
                 s = model["sections"][tag]
                 if "section" in s:
                     s = model["sections"][s["section"]]
                     for s,f in iter_section_fibers(model, s, damage_state):
-                        yield el,s,f
+                        yield el,idx+1,f
 
 def iter_section_fibers(model, s, damage_state=None):
     if damage_state is not None:
@@ -43,7 +46,7 @@ def print_fiber(c, base_cmd):
 
 def print_help():
     print("""
-    get_fibers model.json output.txt -d Dcol -e E... -s STATE
+    get_fibers model.json output.txt -d Dcol -e E... -l STATE
 """)
 
 def parse_args(args)->dict:
@@ -60,6 +63,9 @@ def parse_args(args)->dict:
                 int(e) for e in next(argi).split(",")
             ]
         elif arg == "-s":
+            opts["sections"] = [int(s) for s in next(argi).split(",")]
+
+        elif arg == "-l":
             opts["state"] = next(argi)
         elif opts["model_file"] is None:
             opts["model_file"] = arg
@@ -103,13 +109,15 @@ if __name__=="__main__":
 
     elements = opts["elements"]
 
+    sections = opts["sections"]
+
     out_file = opts["record_file"]
 
     base_cmd = base_cmd.format(out_file=out_file)
     with open(opts["model_file"], "r") as f:
         model = json.load(f)
 
-    for e,s,f in iter_elem_fibers(model, elements, damage_state):
+    for e,s,f in iter_elem_fibers(model, elements, sections, damage_state):
         elem_cmd = base_cmd + f"-ele {e['name']} "
-        print_fiber(f["coord"], elem_cmd + f"section {s['name']} ")
+        print_fiber(f["coord"], elem_cmd + f"section {s} ")
 
