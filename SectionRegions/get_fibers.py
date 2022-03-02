@@ -41,8 +41,11 @@ def iter_section_fibers(model, s, damage_state=None):
             yield s,fiber
 
 def print_fiber(c, base_cmd):
+    out_file = opts["record_file"] + "_" + str(c[0]) + "_" + str(c[1]) + ".txt"
+    base_cmd = base_cmd.format(out_file=out_file)
     fiber_cmd = base_cmd + f"fiber {c[0]} {c[1]} stressStrain;\n"
     print(fiber_cmd)
+    print("puts \""+fiber_cmd+"\"")
 
 def print_help():
     print("""
@@ -111,13 +114,9 @@ if __name__=="__main__":
 
     sections = opts["sections"]
 
-    out_file = opts["record_file"]
-
-    base_cmd = base_cmd.format(out_file=out_file)
     with open(opts["model_file"], "r") as f:
         model = json.load(f)
 
     for e,s,f in iter_elem_fibers(model, elements, sections, damage_state):
         elem_cmd = base_cmd + f"-ele {e['name']} "
         print_fiber(f["coord"], elem_cmd + f"section {s} ")
-
