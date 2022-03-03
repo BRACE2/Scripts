@@ -29,8 +29,7 @@ def damage_states(Dcol):
 }
 # --8<--------------------------------------------------------
 
-
-def iter_elem_fibers(model:dict, elements:list, sections: list = (0,), filt:dict=None):
+def iter_elem_fibers(model:dict, elements:list, sections: list, damage_state:dict=None):
     sam = model["StructuralAnalysisModel"]
     model["sections"] = {
         str(s["name"]): s for s in sam["properties"]["sections"]
@@ -47,20 +46,20 @@ def iter_elem_fibers(model:dict, elements:list, sections: list = (0,), filt:dict
                 s = model["sections"][tag]
                 if "section" in s:
                     s = model["sections"][s["section"]]
-                    for s,f in iter_section_fibers(model, s, filt):
+                    for s,f in iter_section_fibers(model, s, damage_state):
                         yield el,idx+1,f
 
-def iter_section_fibers(model, s, filt=None):
-    if filt is not None:
-        if "material" not in filt:
-            filt["material"] = "*"
+def iter_section_fibers(model, s, damage_state=None):
+    if damage_state is not None:
+        if "material" not in damage_state:
+            damage_state["material"] = "*"
         for fiber in s["fibers"]:
             if any(
                 fiber["coord"] in region
-                for region in filt["regions"]
+                for region in damage_state["regions"]
             ) and fnmatch.fnmatch(
                 model["materials"][fiber["material"]]["type"].lower(),
-                filt["material"]
+                damage_state["material"]
             ):
                 yield s,fiber
     else:
@@ -74,6 +73,7 @@ def print_fiber(c, s, base_cmd, options):
     print(fiber_cmd)
     if options["logging"]:
         print("puts \""+fiber_cmd+"\"")
+
 
 def print_help():
     print("""
@@ -138,9 +138,10 @@ if __name__=="__main__":
     opts = parse_args(sys.argv[1:])
 
     damage_state = damage_states(opts["Dcol"])[opts["state"]]
+
     elements = opts["elements"]
+
     sections = opts["sections"]
-    out_file = opts["record_file"]
 
     with open(opts["model_file"], "r") as f:
         model = json.load(f)
