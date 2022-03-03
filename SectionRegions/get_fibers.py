@@ -1,6 +1,6 @@
 import json, sys, fnmatch
 from opensees import patch, section
-from opensees.section import PatchOctagon as Octagon
+from opensees.section import ConfinedOctagon as Octagon
 
 # --8<--------------------------------------------------------
 def damage_states(Dcol):
@@ -14,7 +14,7 @@ def damage_states(Dcol):
       },
       "dsr2" : {
           "regions": [
-              section.FiberSection(fibers=[
+              section.FiberSection(areas=[
                   patch.circ(intRad=Rcol-cover-2, extRad=Rcol-cover)
               ])
           ],
@@ -67,40 +67,70 @@ def iter_section_fibers(model, s, filt=None):
         for fiber in s["fibers"]:
             yield s,fiber
 
-def print_fiber(c, base_cmd):
+def print_fiber(c, s, base_cmd, options):
+    out_file = options["record_file"] +f"_{s}" + "_" + str(c[0]) + "_" + str(c[1]) + ".txt"
+    base_cmd = base_cmd.format(fmt=options["format"],out_file=out_file)
     fiber_cmd = base_cmd + f"fiber {c[0]} {c[1]} stressStrain;\n"
     print(fiber_cmd)
+    if options["logging"]:
+        print("puts \""+fiber_cmd+"\"")
 
 def print_help():
     print("""
     get_fibers model.json output.txt -d Dcol -e E... -l STATE
+
+    Options
+    -file | -xml
+    -logging <int>
+    -d[iameter] <float>
 """)
 
 def parse_args(args)->dict:
     opts = {
         "model_file": None,
-        "record_file": None
+        "record_file": None,
+        "logging": 0,
+        "format": "file"
     }
     argi = iter(args)
     for arg in argi:
-        if arg == "-d":
+        if arg[:2] == "-h":
+            print_help()
+            sys.exit()
+
+        if arg[:2] == "-d":
             opts["Dcol"] = float(next(argi))
+
         elif arg == "-e":
             opts["elements"] =  [
                 int(e) for e in next(argi).split(",")
             ]
+
         elif arg == "-s":
             opts["sections"] = [int(s) for s in next(argi).split(",")]
 
         elif arg == "-l":
             opts["state"] = next(argi)
+        
+        # Formats
+        elif arg == "-file":
+            opts["format"] = "file"
+        elif arg == "-xml":
+            opts["format"] = "xml"
+
+        elif arg == "-logging":
+            opts["logging"] = next(argi)
+
         elif opts["model_file"] is None:
             opts["model_file"] = arg
+
+
         else:
             opts["record_file"] = arg
+
     return opts
 
-base_cmd = "recorder Element -xml {out_file} -time "
+base_cmd = "recorder Element -{fmt} {out_file} -time "
 
 
 if __name__=="__main__":
@@ -112,11 +142,10 @@ if __name__=="__main__":
     sections = opts["sections"]
     out_file = opts["record_file"]
 
-    base_cmd = base_cmd.format(out_file=out_file)
     with open(opts["model_file"], "r") as f:
         model = json.load(f)
 
-    for _,s,f in iter_elem_fibers(model, elements, sections, damage_state):
+    for e,s,f in iter_elem_fibers(model, elements, sections, damage_state):
         elem_cmd = base_cmd + f"-ele {e['name']} "
-        print_fiber(f["coord"], elem_cmd + f"section {s} ")
+        print_fiber(f["coord"], s, elem_cmd + f"section {s} ", opts)
 
