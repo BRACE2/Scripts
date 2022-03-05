@@ -1,4 +1,5 @@
 import json, sys, fnmatch
+import numpy as np
 from opensees import patch, section
 from opensees.section import ConfinedOctagon as Octagon
 
@@ -6,27 +7,54 @@ from opensees.section import ConfinedOctagon as Octagon
 def damage_states(Dcol):
     cover = 2.0
     Rcol = Dcol/2
+    coverl = cover + Rcol*(1-np.cos(np.pi/8))
     return {
-      "dsr1" : {
-          "regions": [
-              Octagon(Rcol, Rcol)
-          ]
-      },
-      "dsr2" : {
-          "regions": [
-              section.FiberSection(areas=[
-                  patch.circ(intRad=Rcol-cover-2, extRad=Rcol-cover)
-              ])
-          ],
-          "material": "*steel*"
-      },
-      "dsr3" : {
-          "regions": [
-          #             external radius      internal radius
-              Octagon(Rcol-cover*(1-0.75), Rcol-cover*(1-0.5))
-          ]
-      }
-}
+        "dsr1" : {
+            "regions": [
+                 # external radius    internal radius
+                Octagon(Rcol,         Rcol-1e-14)
+            ]
+        },
+        "dsr2" : {
+            "regions": [
+                Octagon(Rcol,         Rcol-coverl/4)
+            ]
+        },
+        "dsr3" : {
+            "regions": [
+                Octagon(Rcol-coverl/2+0.25, Rcol-3*coverl/4-0.25)
+            ],
+            "material": "*concr*"
+        },
+        "dsr4" : {
+            "regions": [
+                Octagon(Rcol-3*coverl/4, Rcol-coverl)
+            ],
+            "material": "*concr*"
+        },
+        "dsr5": {
+            "regions": [
+                section.FiberSection(areas=[
+                    patch.circ(intRad=Rcol - cover - 2, extRad=Rcol - cover)
+                ])
+            ],
+            "material": "*concr*"
+        },
+        "dsr6": {
+            "regions": [
+                section.FiberSection(areas=[
+                    patch.circ(intRad=Rcol - cover - 2, extRad=Rcol - cover)
+                ])
+            ],
+            "material": "*steel*"
+        },
+        "all" : {
+            "regions": [
+                Octagon(Rcol, Rcol-10)
+            ]
+        }
+    }
+
 # --8<--------------------------------------------------------
 
 def iter_elem_fibers(model:dict, elements:list, sections: list, damage_state:dict=None):
