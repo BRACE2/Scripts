@@ -50,7 +50,7 @@ def damage_states(Dcol):
         },
         "all" : {
             "regions": [
-                Octagon(Rcol, Rcol-10)
+                Octagon(Rcol)
             ]
         }
     }
