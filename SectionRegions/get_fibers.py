@@ -1,15 +1,17 @@
 import json, sys, fnmatch
 from opensees import patch, section
-from opensees.section import ConfinedOctagon as Octagon
+# from opensees.section import ConfinedOctagon as Octagon
 
 # --8<--------------------------------------------------------
 def damage_states(Dcol):
     cover = 2.0
     Rcol = Dcol/2
     return {
+      # Any outermost cover fiber
       "dsr1" : {
           "regions": [
-              Octagon(Rcol, Rcol)
+              ConfinedPolygon(Rcol, Rcol),
+              PolygonRing(Rcol, Rcol-0.05)
           ]
       },
       "dsr2" : {
@@ -23,13 +25,14 @@ def damage_states(Dcol):
       "dsr3" : {
           "regions": [
           #             external radius      internal radius
-              Octagon(Rcol-cover*(1-0.75), Rcol-cover*(1-0.5))
-          ]
-      }
+              section.PolygonRing(Rcol-cover*(1-0.75), Rcol-cover*(1-0.5))
+          ],
+          "material": "*concr*"
+      },
 }
 # --8<--------------------------------------------------------
 
-def iter_elem_fibers(model:dict, elements:list, sections: list, damage_state:dict=None):
+def iter_elem_fibers(model:dict, elements:list, sections: list=(0,-1), filt:dict=None):
     sam = model["StructuralAnalysisModel"]
     model["sections"] = {
         str(s["name"]): s for s in sam["properties"]["sections"]
@@ -46,20 +49,20 @@ def iter_elem_fibers(model:dict, elements:list, sections: list, damage_state:dic
                 s = model["sections"][tag]
                 if "section" in s:
                     s = model["sections"][s["section"]]
-                    for s,f in iter_section_fibers(model, s, damage_state):
+                    for s,f in iter_section_fibers(model, s, filt):
                         yield el,idx+1,f
 
-def iter_section_fibers(model, s, damage_state=None):
-    if damage_state is not None:
-        if "material" not in damage_state:
-            damage_state["material"] = "*"
+def iter_section_fibers(model, s, filt=None):
+    if filt is not None:
+        if "material" not in filt:
+            filt["material"] = "*"
         for fiber in s["fibers"]:
             if any(
                 fiber["coord"] in region
-                for region in damage_state["regions"]
+                for region in filt["regions"]
             ) and fnmatch.fnmatch(
                 model["materials"][fiber["material"]]["type"].lower(),
-                damage_state["material"]
+                filt["material"]
             ):
                 yield s,fiber
     else:
