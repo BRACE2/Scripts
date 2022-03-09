@@ -1,4 +1,5 @@
 import json, sys, fnmatch
+import numpy as np
 from opensees import patch, section
 # from opensees.section import ConfinedOctagon as Octagon
 
@@ -6,30 +7,54 @@ from opensees import patch, section
 def damage_states(Dcol):
     cover = 2.0
     Rcol = Dcol/2
+    coverl = cover + Rcol*(1-np.cos(np.pi/8))
     return {
-      # Any outermost cover fiber
-      "dsr1" : {
-          "regions": [
-              ConfinedPolygon(Rcol, Rcol),
-              PolygonRing(Rcol, Rcol-0.05)
-          ]
-      },
-      "dsr2" : {
-          "regions": [
-              section.FiberSection(areas=[
-                  patch.circ(intRad=Rcol-cover-2, extRad=Rcol-cover)
-              ])
-          ],
-          "material": "*steel*"
-      },
-      "dsr3" : {
-          "regions": [
-          #             external radius      internal radius
-              section.PolygonRing(Rcol-cover*(1-0.75), Rcol-cover*(1-0.5))
-          ],
-          "material": "*concr*"
-      },
-}
+        "dsr1" : {
+            "regions": [
+                 # external radius    internal radius
+                section.PolygonRing(8, Rcol,         Rcol-1e-14)
+            ]
+        },
+        "dsr2" : {
+            "regions": [
+                section.PolygonRing(8, Rcol,         Rcol-coverl/4)
+            ]
+        },
+        "dsr3" : {
+            "regions": [
+                section.PolygonRing(8, Rcol-coverl/2+0.25, Rcol-3*coverl/4-0.25)
+            ],
+            "material": "*concr*"
+        },
+        "dsr4" : {
+            "regions": [
+                section.PolygonRing(8, Rcol-3*coverl/4, Rcol-coverl)
+            ],
+            "material": "*concr*"
+        },
+        "dsr5": {
+            "regions": [
+                section.FiberSection(areas=[
+                    patch.circ(intRad=Rcol - cover - 2, extRad=Rcol - cover)
+                ])
+            ],
+            "material": "*concr*"
+        },
+        "dsr6": {
+            "regions": [
+                section.FiberSection(areas=[
+                    patch.circ(intRad=Rcol - cover - 2, extRad=Rcol - cover)
+                ])
+            ],
+            "material": "*steel*"
+        },
+        "all" : {
+            "regions": [
+                section.ConfinedPolygon(8, Rcol)
+            ]
+        }
+    }
+
 # --8<--------------------------------------------------------
 
 def iter_elem_fibers(model:dict, elements:list, sections: list=(0,-1), filt:dict=None):
