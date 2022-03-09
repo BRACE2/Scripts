@@ -12,7 +12,7 @@ def damage_states(Dcol):
         "dsr1" : {
             "regions": [
                  # external radius    internal radius
-                section.PolygonRing(8, Rcol,         Rcol-1e-14)
+                section.PolygonRing(8, Rcol,         Rcol-1)
             ]
         },
         "dsr2" : {
