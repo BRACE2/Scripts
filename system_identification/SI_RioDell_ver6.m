@@ -2,6 +2,9 @@ close all;
 clear all;
 clc;
 
+options.run_srim          = true;
+options.plot_fft_tf       = true;
+options.plot_time_history = true;
 % System Identification of Rio Dell Bridge. It consists of three main parts.
 % 1st part is based on the Transfer Function Estimate (TFE) and identifies the
 % natural periods and damping ratios by Gunay & Mosalam (2021).
@@ -16,7 +19,7 @@ clc;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Constants
-g = 981;                                           %acceleration of gravity in cm/sec^2
+g = 980.7;                                         %acceleration of gravity in cm/sec^2
 %% Inputs
 
 inputname = input('Do you want to input folder name [Y/N]:', 's');
@@ -32,22 +35,20 @@ FolderName
 Minperiod = 0.18;                                  %Min period range to specify peak amplitude
 Maxperiod = 0.90;                                  %Max period range to specify peak amplitude
 
-
-
 % In terms of input and output channels, five cases can be considered:
 
 %Case 1: Input in transverse direction, output in transverse direction
-%Input channels: 3; Output channels: 7
+%        Input channels: 3; Output channels: 7
 %Case 2: Input in longitudinal direction, output in longitudinal direction
-%Input channels: 1; Output channel: 11
+%        Input channels: 1; Output channel: 11
 %Case 3: Input in longitudinal direction, output in vertical direction
-%Considering that the bridge is similar to a frame in the longitudinal direction,
-%shaking along this direction results in long. translational accelerations as well
-%as bending & rotation of the deck, causing vertical accelerations on deck nodes.
-%Case 3 makes use of this behavior to identify the long. mode. The influence vector
-%of long. ground motions on vertical accelerations is zero, which is a concern,
-%but this is still a useful case.
-%Input channels: 1; Output channels: 6
+%       Considering that the bridge is similar to a frame in the longitudinal direction,
+%       shaking along this direction results in long. translational accelerations as well
+%       as bending & rotation of the deck, causing vertical accelerations on deck nodes.
+%       Case 3 makes use of this behavior to identify the long. mode. The influence vector
+%       of long. ground motions on vertical accelerations is zero, which is a concern,
+%       but this is still a useful case.
+%       Input channels: 1; Output channels: 6
 %Case 4: Input in longitudinal direction, output in longitudinal & vertical directions.
 %        This is a case that can only be applied to OKID-ERA-DC. Therefore, it is the same
 %        as Case 3 in TFE, and similar to Case 3 in OKID-ERA-DC, except that the output
@@ -113,28 +114,26 @@ for jj = 1:2
         filename = inpfilename;
         Channel = InpChan;
     end
-
     if jj == 2
         filename = outfilename;
         Channel = OutChan;
     end
-
     % readv2 is a function that reads accelerometer data & time step from CSMIP format.
     % This format is same for historical data & real-time data for the Hayward Bridge.
     [acc dt] = readv2(filename);
     acc_amp = max(acc(:));
-
+    if options.plot_time_history
     % plot the accelerations in input & output channels
-    figure;
-    ts = 0:dt:(length(acc)-1)*dt;
-    plot(ts,acc/g);
-    hold on;
-    xlabel('Time [Sec]');
-    ylabel('A [g]');
-    xlim ([0.0 (length(acc)-1)*dt]);
-    str = {'Time history of',strcat('Channel  = ',num2str(Channel))};
-    text(0.5,acc_amp/g*.75,str)
-
+        figure;
+        ts = 0:dt:(length(acc)-1)*dt;
+        plot(ts,acc/g);
+        hold on;
+        xlabel('Time [Sec]');
+        ylabel('A [g]');
+        xlim ([0.0 (length(acc)-1)*dt]);
+        str = {'Time history of',strcat('Channel  = ',num2str(Channel))};
+        text(0.5,acc_amp/g*.75,str)
+    end
     % compute the response spectrum [requires specifying damping ratio] & Fourier Amplitude (FA)
     % spectrum. A very small damping ratio is used such that the response spectrum & TF
     % are not affected by the damping ratio.
@@ -281,17 +280,17 @@ text(0.5,Ampap*0.75,str)
 
 str = {'Based on User Specified Range',strcat('Period (sec)  = ',num2str(Period2)),strcat('Damping ratio (%)  = ',num2str(dmpratio2))};
 text(0.5, Ampap*0.55,str)
-
-% Plot the transfer function based on FFT
-figure;
-Tf = 1./ff1;
-TF = FFA2./FFA1;
-plot(Tf,TF);
-hold on;
-xlabel('Period [sec]');
-ylabel('Transfer function = FFA(response) / FFA(input)');
-xlim ([Minperiod 1]);
-
+if options.plot_fft_tf
+    % Plot the transfer function based on FFT
+    figure;
+    Tf = 1./ff1;
+    TF = FFA2./FFA1;
+    plot(Tf,TF);
+    hold on;
+    xlabel('Period [sec]');
+    ylabel('Transfer function = FFA(response) / FFA(input)');
+    xlim ([Minperiod 1]);
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% End of PART 1: Transfer Function Estimate                           %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -326,7 +325,7 @@ case 'Case5'
 end
 
 clear dat
-nc = length(anac);                                 % number of channels
+nc = length(anac);          % number of channels
 for r = 1:nc
     if anac(r)<10
         fname = strcat(FolderName,'/','CHAN00',num2str(anac(r)),'.v2');
@@ -337,11 +336,17 @@ for r = 1:nc
     [a to] = readv2(fname);
     dat(:,r) = a;
 end
-d  = size(dat,1); % total number of time steps
+d  = size(dat,1);           % total number of time steps
 nc = size(dat,2);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% PART 2: OKID-ERA-DC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 div  =    1;
+% Pre-processing
 [dati, dato, dn, dt] = PreOkid(dat, to, div, inpchns, outchns);
+
+% set options for OKID-ERA-DC
 config_okid.dn   =   dn;
 config_okid.mro  =   10;
 config_okid.orm  =    4;
@@ -357,16 +362,19 @@ modeplot(modeshape, freqdmp,Case);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% PART 3: System Realization by Information Matrix (SRIM)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-config_srim.p   =  5;
-config_srim.to  = to;
-config_srim.dn  = dn;
-config_srim.orm =  4;  % same as OKID_ERA_DC
-tic
-[freqdmpSRIM, modeshapeSRIM, RMSEpredSRIM] = SRIM(dati, dato, config_srim);
-toc
 
-% Plot the mode shape together with frequency & damping ratio information
-modeplot(modeshapeSRIM, freqdmpSRIM, Case);
+if options.run_srim
+    config_srim.p   =  5;
+    config_srim.to  = to;
+    config_srim.dn  = dn;
+    config_srim.orm =  4;  % same as OKID_ERA_DC
+    tic
+    [freqdmpSRIM, modeshapeSRIM, RMSEpredSRIM] = SRIM(dati, dato, config_srim);
+    toc
 
-sprintf('Prediction Error Average for SRIM %0.4g',RMSEpredSRIM)
+    % Plot the mode shape together with frequency & damping ratio information
+    modeplot(modeshapeSRIM, freqdmpSRIM, Case);
+    
+    sprintf('Prediction Error Average for SRIM %0.4g',RMSEpredSRIM)
+end
 

@@ -13,12 +13,14 @@ function [freqdmp, modeshape, RMSEpred, markovParamError] = OKID_ERA_DC(dati, da
 % 2. Identify observer Kalman filters using Observer Kalman filter Identification (OKID)
 %    methodology. This step basically consists of developing a simple observer model of
 %    a system from a MIMO ARX structure, Eq. (3.76), which is broken into these 6 steps:
+%
 % 2a. Determine Markov parameters (M) in a least squares sense, Eq. (3.76).
-% 2b. Establish the Hankel matrix (H) from the Markov parameters, (Eq. 3.80).
-% 2c. Use H to compute system matrices A, B & C, in which modal information is embedded.
-% 2d. Obtain the modal information from matrices A, B & C.
-% 2e. Spatial & temporal validation of the identified modes.
-% 2f. Back calculate (estimate) the output accelerations with the state-space system &
+
+% 3b. Establish the Hankel matrix (H) from the Markov parameters, (Eq. 3.80).
+% 3c. Use H to compute system matrices A, B & C, in which modal information is embedded.
+% 3d. Obtain the modal information from matrices A, B & C.
+% 3e. Spatial & temporal validation of the identified modes.
+% 3f. Back calculate (estimate) the output accelerations with the state-space system &
 %     check against the actual output accelerations.
 %%%
 
@@ -111,10 +113,11 @@ for b = 2:p+1
     U((b-2)*(r+m)+1+r:(b-2)*(r+m)+r+r+m,b:l) = [dati(1:l-b+1,1:r)'; dato(1:l-b+1,1:m)'];
 end
 
-% i) Compute the matrix of Observer Markov Parameter Matrix (M) in Eq 3.76 using Linear Regression
-[uu,s,v] = svd(U,0);     %svd: Singular Value Decomposition function in Matlab
-%s is a diagonal matrix with the singular values
-wr = diag(s);            %singular values are extracted from the diagonal matrix using diag function
+% i) Compute the matrix of Observer Markov Parameter Matrix (M) 
+%    in Eq 3.76 using Linear Regression
+[uu,s,v] = svd(U,0);     % svd: Singular Value Decomposition
+                         %      s is a diagonal matrix with the singular values
+wr = diag(s);            % extract singular values from the diagonal matrix
 pg = (r+m)*p+r;
 for lop = 1:(r+m)*p+r
     if wr(lop) <= 0.001
@@ -144,6 +147,7 @@ end
 
 % Matrix D is directly equal to the Observer Markov parameter matrix (Eq. 3.77)
 D = M(:,1:r);  % D: Direct Transmission term, one of 4 system matrices of state space model
+
 % Eqs. 3.31-3.34 define the four system matrices, A, B, C & D
 Y{1}=D;
 % First p steps (Eq. 3.78)
@@ -176,11 +180,11 @@ for hj = 1:kmax
     end
 end
 
-%% 2c. Use H matrix to compute system matrices A, B & C where modal information is embedded.
+%% 2c. Use H matrix to compute system matrices A, B & C
 
-[R1,Sis,S1] = svd(H0); %singular value decomposition
+[R1,Sis,S1] = svd(H0); % singular value decomposition
 
-n = orm;               %assign order of model input to variable n, consistent with Eqs. 3.81-3.84
+n = orm;               % assign order of model input to variable n, consistent with Eqs. 3.81-3.84
 
 A = Sis(1:n,1:n)^(-0.5)*R1(:,1:n)'*H1*S1(:,1:n)*Sis(1:n,1:n)^(-0.5); %A: state transition matrix (Eqs. 3.32 & 3.82)
 Qb = Sis(1:n,1:n)^0.5*S1(:,1:n)';
@@ -188,7 +192,6 @@ B = Qb(:,1:r);                                                       %B: input i
 Pb = R1(:,1:n)*Sis(1:n,1:n)^0.5;
 C = Pb(1:m,:);                                                       %C: output influence matrix (Eqs. 3.34 & 3.84)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% 2d. Obtain the modal information from the system matrices A, B & C
 % This includes determination of: a) modal frequencies, b) damping ratios & c) mode shapes
@@ -280,7 +283,7 @@ for er = 1:l
             emaci(qak,qzk) = Rik(qak,qzk)*Wik(qak,qzk);
         end
     end
-    %Weight for emaci
+    % Weight for emaci
     emacif = zeros(n,1);
     for xc = 1:n
         sumi = 0;

@@ -91,7 +91,7 @@ Rhh = Ryy - Ruy'*(Ruu\Ruy);
 % Partial decomposition equations are available. They are commented out.
 
 % Full Decomposition Method
-[un1,s1,uo1] = svd(Rhh,0);               % Eq. 3.74
+[un1,~,~] = svd(Rhh,0);               % Eq. 3.74
 Op1 = un1(:,1:n1);                       % Eq. 3.72
 
 %% 2d. Use the observability matrix to compute system matrices A, B & C, in which modal information is embedded.
@@ -102,13 +102,12 @@ A1 = lsqminnorm(Op1(1:(p-1)*m,:), Op1(m+1:p*m,:));
 C1 = Op1(1:m,:);
 %%KKKKK
 % Partial Decomposition Method
-[un2,s2,uo2] = svd(Rhh(:,1:(p-1)*m),0);
+[un2,~,~] = svd(Rhh(:,1:(p-1)*m),0);
 %A2 = lsqminnorm(Op2(1:(p-1)*m,:), Op2(m+1:p*m,:));
 Op2 = un2(:,1:n1);
 %C2 = Op2(1:m,:);
 %%KKKKK
 
-%% Note: A2 & C2 not used herein
 
 % Computation of system matrices B & D
 % Note that these computations are commented out as it is not possible to compute B & D
@@ -119,11 +118,14 @@ Op2 = un2(:,1:n1);
 %%KKKKK
 fi  = zeros(m*nsizS, n1+m*r+n1*r);
 A_p = A1;
+In1n1 = speye(n1,n1);
+krn = zeros(n1,m*n1,1+nsizS);
 CA_powers = zeros(m, size(A1,2), 1+nsizS);
 CA_powers(:,:,1) = C1*A_p;
 for pwr = 1:nsizS
     A_p = A1*A_p;
     CA_powers(:,:,pwr+1) =  C1*A_p;
+    krn(:,:,pwr) = kron(dati(pwr,:),In1n1);
 end
 
 %
@@ -140,15 +142,12 @@ for df = 1:nsizS
 end
 %
 % Third block column of fi
-In1n1 = speye(n1,n1);
 cc = n1+m*r+1;
 dd = n1+m*r+n1*r;
 fi3 = zeros(m, dd-cc+1, nsizS-1);
 
 parfor df = 2:nsizS
-    a = (df-1)*m+1;
-    b = df*m;
-    fi3(:,:,df) = block_3(df, m, CA_powers, dati, n1, r, C1);
+    fi3(:,:,df) = block_3(df, CA_powers, dati, n1, C1,krn);
 end
 for df = 2:nsizS
     a = (df-1)*m+1;
@@ -160,7 +159,8 @@ end
 dattemp = dato(1:nsizS,:)';
 y = dattemp(:);
 %
-teta = lsqminnorm(fi,y);
+% [teta, flag, relres] = lsqminnorm(fi,y);
+teta = lsqminnorm(fi,y,1e-8);
 
 x0 = teta(1:n1);
 dcol = teta(n1+1:n1+m*r);
@@ -292,10 +292,10 @@ end
 RMSEpredSRIM = sum(Jm)/m;
 %%KKKKK
 
-function fi = block_3(df, m, CA_powers, dati, n1, r, C1)
+function fi = block_3(df, CA_powers, dati, n1, C1, krn)
     In1n1 = speye(n1,n1);
     fi = C1*kron(dati(df-1,:),In1n1);
     for nmf = 1:df-2
-        fi = fi + CA_powers(:,:,df-nmf-1)*kron(dati(nmf,:),In1n1);
+        fi = fi + CA_powers(:,:,df-nmf-1)*krn(:,:,nmf); %kron(dati(nmf,:),In1n1);
     end
 
