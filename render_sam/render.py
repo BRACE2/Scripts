@@ -1,7 +1,10 @@
 #!/bin/env python
+
+__version__ = "0.0.2"
+
 # # Synopsis
 #
-# >`render.py [<options>] <model-file>
+# >`render.py [<options>] <model-file>`
 #
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
 # 
@@ -20,6 +23,7 @@
 # from a terminal that has python installed, in a
 # directory containing the `render.py` file. This
 # will install the following packages:
+
 
 REQUIREMENTS = """
 pyyaml
@@ -52,32 +56,38 @@ matplotlib
 NAME = "render.py"
 HELP = f"""
 usage: {NAME} <sam-file>
-       {NAME} --install
+       {NAME} --setup ...
        {NAME} [options] <sam-file>
        {NAME} [options] <sam-file> <res-file>
+       {NAME} --section <py-file>#<py-object>
 
 Generate a plot of a structural model.
 
 Positional Arguments:
   <sam-file>                     JSON file defining the structural model.
   <res-file>                     JSON or YAML file defining a structural
-                                   response.
+                                 response.
 
 Options:
+  DISPLACEMENTS
   -s, --scale  <scale>           Set displacement scale factor.
   -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
                                  <node> in direction <dof>.
+  VIEWING
   -V, --view   {{elev|plan|sect}}  Set camera view.
   -a, --axes   [<L><T>]<V>       Specify model axes. Only <V> is required
       --hide   <object>          Hide <object>; see '--show'.
       --show   <object>          Show <object>; accepts any of:
                                     {{origin|frames|frames.displ|nodes|nodes.displ}}
 
+  MISC.
   -o, --save   <out-file>        Save plot to <out-file>.
   -c, --conf
 
       --install                  Install script dependencies.
+      --setup                    Run setup operations.
       --script {{sam|res}}
+      --version                  Print version and exit.
   -h, --help                     Print this message and exit.
 
 
@@ -112,6 +122,7 @@ Examples:
 
 Config = lambda : {
   "show_objects": ["frames", "frames.displ", "nodes"],
+  "mode_num"    : None,
   "hide_objects": ["origin"],
   "sam_file":     None,
   "elem_by_type": False,
@@ -135,7 +146,7 @@ Config = lambda : {
       "origin": {"color": "black"},
 
       "frames" : {
-          "color": "#000000",
+          "default": "#000000",
           "displaced": {"color": "red", "npoints": 20}
       },
 
@@ -157,7 +168,6 @@ Config = lambda : {
 
 def apply_config(conf, opts):
     for k,v in conf.items():
-        print(k,v)
         if isinstance(v,dict):
             apply_conf(v, opts[k])
         else:
@@ -184,6 +194,7 @@ try:
     FLOAT = np.float32
     from scipy.linalg import block_diag
 except:
+    # prevent undefined variables when run in install mode
     yaml = None
     Array = list
     FLOAT =  float
@@ -312,7 +323,6 @@ def displaced_profile(
     plan_curve = elastic_curve(xaxis, plan_dofs(v), Lnew)
     elev_curve = elastic_curve(xaxis, elev_dofs(v), Lnew)
 
-    #dy,dz = Q[1:,1:]@np.linspace(displ[1:3], displ[7:9], n).T
     dx,dy,dz = Q@np.linspace(displ[:3], displ[6:9], n).T
     local_curve = np.stack([xaxis+dx[0], plan_curve+dy, elev_curve+dz])
 
@@ -352,13 +362,13 @@ def set_axis_limits(ax):
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
 
-def plot_skeletal(frame, axes=None):
+def plot_skeletal(frame, axes=None, conf=None):
     if axes is None: axes = [0,2,1]
-    props = {"frame": {"color": "grey", "alpha": 0.6}}
+    props = conf or {"color": "grey", "alpha": 0.6, "linewidth": 0.5}
     ax = new_3d_axis()
     for e in frame["elems"].values():
         x,y,z = e["crd"].T[axes]
-        ax.plot(x,y,z, **props["frame"])
+        ax.plot(x,y,z, **props)
     return ax
 
 
@@ -381,7 +391,7 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     return ax
 
 def plot_displ(frame:dict, res:dict, ax=None, axes=None):
-    props = {"color": "#660505"}
+    props = {"color": "#660505", "linewidth": 0.5}
     ax = ax or new_3d_axis()
     if axes is None: axes = [0,2,1]
     for el in frame["elems"].values():
@@ -403,6 +413,96 @@ class Plotter:
         if axes is None: axes = [0,2,1]
         self.axes = axes
         self.opts = opts
+
+class MplPlotter(Plotter):
+    def __init__(self, **kwds):
+        pass
+    def get_section_layers(self, section):
+        import matplotlib.collections
+        import matplotlib.lines as lines
+        collection = []
+        for layer in section.layers:
+            if hasattr(layer, "plot_opts"):
+                options = layer.plot_opts
+            else:
+                options = dict(linestyle="--", color="k")
+            collection.append(
+                lines.Line2D(*np.asarray(layer.vertices).T, **options))
+        return collection
+
+    def get_section_patches(self, section):
+        import matplotlib.collections
+        import matplotlib.patches as mplp
+        collection = []
+        for patch in section.patches:
+            name = patch.__class__.__name__.lower()
+            if "circ" in name:
+                if patch.intRad:
+                    width = patch.extRad - patch.intRad
+                    collection.append(mplp.Annulus(patch.center, patch.extRad, width))
+                else:
+                    collection.append(mplp.Circle(patch.center, patch.extRad))
+            else:
+                collection.append(mplp.Polygon(patch.vertices))
+        return matplotlib.collections.PatchCollection(
+            collection,
+            facecolor="grey",
+            edgecolor="grey",
+            alpha=0.3
+        )
+
+    def plot_section(self,
+        section,
+        show_properties=False,
+        plain=True,
+        show_quad=True,
+        show_dims=True,
+        annotate=True,
+        ax = None,
+        fig = None,
+        **kwds
+    ):
+        """Plot a composite cross section."""    
+        import matplotlib.pyplot as plt
+        if plain:
+            show_properties = show_quad = show_dims = False
+
+        if show_properties:
+            fig = plt.figure(constrained_layout=True)
+            gs = fig.add_gridspec(1,5)
+            axp = fig.add_subplot(gs[0,3:-1])
+            label = "\n".join(["${}$:\t\t{:0.4}".format(k,v) for k,v in self.properties().items()])
+            axp.annotate(label, (0.1, 0.5), xycoords='axes fraction', va='center')
+            axp.set_autoscale_on(True)
+            axp.axis("off")
+
+            ax = fig.add_subplot(gs[0,:3])
+        else:
+            fig, ax = plt.subplots()
+
+        if ax is None:
+            fig, ax = plt.subplots()
+        ax.set_autoscale_on(True)
+        ax.set_aspect(1)
+
+        #x_max = 1.01 * max(v[0] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+        #y_max = 1.05 * max(v[1] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+        #y_min = 1.05 * min(v[1] for p in self.patches for v in p.vertices if hasattr(p,"vertices"))
+
+        #ax.set_xlim(-x_max, x_max)
+        #ax.set_ylim( y_min, y_max)
+        ax.axis("off")
+        # add shapes
+        ax.add_collection(self.get_section_patches(section,**kwds))
+        for l in self.get_section_layers(section):
+            ax.add_line(l)
+        # show centroid
+        #ax.scatter(*section.centroid)
+        # show origin
+        ax.scatter(0, 0)
+        plt.show()
+        
+        return fig, ax
 
 class GnuPlotter(Plotter):
     def plot_frames(self):
@@ -463,6 +563,7 @@ class PlotlyPlotter(Plotter):
             "line": {"color":props["color"]},
             "hoverinfo":"skip"
         }
+
     def make_hover_data(self, data, ln=None):
         if ln is None:
             items = np.array([d.values for d in data])
@@ -475,10 +576,20 @@ class PlotlyPlotter(Plotter):
             "customdata": list(items),
         }
 
-    def _get_nodes(self):
-        x,y,z = self.model["coord"].T[self.axes]
-        keys  = ["tag",]
-        nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
+    def _get_nodes(self, displ=None):
+        xyz = self.model["coord"].T[self.axes]
+        if not displ:
+            x,y,z = xyz
+            keys  = ["tag",]
+            nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
+        else:
+            x,y,z = xyz + np.array([displ.get(n,[0.0]*3)[:3] for n in self.model["nodes"].keys()]).T
+            keys  = ["tag","displacement", "rotation"]
+            nodes = (
+                    [node, f"{displ[node][3:]}", f"{displ[node][:3]}"]
+                for node in self.model["nodes"].keys()
+            )
+            
         return {
                 "name": "nodes",
                 "x": x, "y": y, "z": z,
@@ -529,12 +640,12 @@ class PlotlyPlotter(Plotter):
 def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
-    if "elems_by_type" in opts and opts["elems_by_type"]:
+    if opts["elem_by_type"]:
         frames = plt._get_frames()
     else:
         frames = plt._get_frames()
     labels = plt._get_frame_labels()
-    nodes = plt._get_nodes()
+    nodes = plt._get_nodes(displ=displ)
     fig = go.Figure(dict(
             #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
             data=[*frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
@@ -577,10 +688,16 @@ def parse_args(argv)->dict:
             elif arg == "--gnu":
                 opts["plotter"] = "gnu"
 
+            elif arg == "--plotly":
+                opts["plotter"] = "plotly"
+
             elif arg == "--install":
                 try: install_me(next(args))
                 # if no directory is provided, use default
                 except StopIteration: install_me()
+                sys.exit()
+            elif arg == "--version":
+                print(__version__)
                 sys.exit()
 
             elif arg[:2] == "-d":
@@ -614,8 +731,8 @@ def parse_args(argv)->dict:
             elif arg == "--elem-by-type":
                 opts["elem_by_type"] = True
 
-            #elif arg[:2] == "-m":
-            #    opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
+            elif arg[:2] == "-m":
+                opts["mode_num"] = int(arg[2]) if len(arg) > 2 else int(next(args))
 
             elif arg[:2] == "-o":
                 opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
@@ -642,7 +759,9 @@ def install_me(install_opt=None):
     import os
     import subprocess
     if install_opt == "dependencies":
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', *REQUIREMENTS.strip().split("\n")])
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", *REQUIREMENTS.strip().split("\n")
+        ])
         sys.exit()
     try:
         from setuptools import setup
@@ -652,14 +771,14 @@ def install_me(install_opt=None):
     sys.argv = sys.argv[:1] + ["develop", "--user"]
     print(sys.argv)
 
-    setup(name='render',
-          version='0.0.1',
-          description='',
+    setup(name="render",
+          version=__version__,
+          description="",
           long_description=HELP,
-          author='', author_email='', url='',
-          py_modules=['render'],
-          scripts=['render.py'],
-          license='',
+          author="", author_email="", url="",
+          py_modules=["render"],
+          scripts=["render.py"],
+          license="",
           install_requires=[*REQUIREMENTS.strip().split("\n")],
     )
 
@@ -670,13 +789,8 @@ TESTS = [
     (True, "{NAME} sam.json -d 5:2,3:2,2:2 -s100 --axes 2 sam.json")
 ]
 
-# Main script
-#----------------------------------------------------
-# The following code is only executed when the file
-# is invoked as a script.
 
 def render(sam_file, res_file=None, **opts):
-
     if sam_file is None:
         raise RenderError("ERROR -- expected positional argument <sam-file>")
 
@@ -691,11 +805,9 @@ def render(sam_file, res_file=None, **opts):
         GnuPlotter(model, axes).plot_frames()
         sys.exit()
 
-    #for obj in opts["show_objects"]:
-    #    plt[obj]
-
-    ax = plot_skeletal(model,axes=axes)
-       
+    #
+    # Handle displacements
+    #
     if res_file is not None:
         from urllib.parse import urlparse
         res_path = urlparse(res_file)
@@ -703,9 +815,12 @@ def render(sam_file, res_file=None, **opts):
             res = yaml.load(f,Loader=yaml.Loader)
         if res_path[4]: # query parameters passed
             res = res[int(res_path[4].split("=")[-1])]
+        elif opts["mode_num"]: # query parameters passed
+            res = res[int(opts["mode_num"])]
 
     else:
         res = {}
+
     for n,d in opts["displ"]:
         v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
         if d < 3: # translational dof
@@ -721,14 +836,6 @@ def render(sam_file, res_file=None, **opts):
                 n[i] *= scale
 
 
-    ax = plot_nodes(model, res, ax=ax, axes=axes)
-    if res:
-        plot_displ(model, res, axes=axes, ax=ax)
-
-    # Handle plot formatting
-    set_axis_limits(ax)
-    ax.view_init(**VIEWS[opts["view"]])
-    if "origin" in opts["show_objects"]: add_origin(ax, scale)
 
     if opts["write_file"]:
     # write plot to file if file name provided
@@ -741,18 +848,51 @@ def render(sam_file, res_file=None, **opts):
                 f.write(html)
         else:
             ax.figure.savefig(opts["write_file"])
+    elif opts["plotter"] == "plotly":
+        fig = plot_plotly(model,axes,displ=res,opts=opts)
+        fig.show(renderer="browser")
+
     else:
-    # otherwise show in new window
+        # Matplotlib
+        ax = plot_skeletal(model, axes=axes)
+        ax = plot_nodes(model, res, ax=ax, axes=axes)
+
+        if res:
+            plot_displ(model, res, axes=axes, ax=ax)
+
+        # Handle plot formatting
+        set_axis_limits(ax)
+        ax.view_init(**VIEWS[opts["view"]])
+        if "origin" in opts["show_objects"]: add_origin(ax, scale)
+
         import matplotlib.pyplot as plt
         plt.show()
-    return ax
+        return ax
+
+# Main script
+#----------------------------------------------------
+# The following code is only executed when the file
+# is invoked as a script.
 
 if __name__ == "__main__":
     opts = parse_args(sys.argv)
-    try:
-        render(**opts)
-    except (FileNotFoundError,RenderError) as e:
-        print(e, file=sys.stderr)
-        print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
-        sys.exit()
+    if "json" in opts["sam_file"]:
+        # Plot structural model
+        try:
+            render(**opts)
+        except (FileNotFoundError,RenderError) as e:
+            print(e, file=sys.stderr)
+            print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
+            sys.exit()
+    else:
+        # Plot a cross section
+        from urllib.parse import urlparse
+        file = urlparse(opts["sam_file"])
+        with open(file.path, "r") as f:
+            script = f.read()
+        scope = {}
+        exec(script, scope)
+        plt = MplPlotter()
+        plt.plot_section(scope[file.fragment])
+
 
