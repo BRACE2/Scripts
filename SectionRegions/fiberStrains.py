@@ -134,7 +134,8 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             YUltFibers6 = np.array(Y6)[iUltFibers6]
             coordsUltFibers6 = np.column_stack((XUltFibers6, YUltFibers6))
             epsUltFibers6 = epst6[iUltFibers6]
-            ultSummary5 = pd.DataFrame(np.column_stack( (coordsUltFibers5, epsUltFibers5, [t]*len(coordsUltFibers5), ["concrete"]*len(coordsUltFibers5)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
+            ultSummary5 = pd.DataFrame(
+                np.column_stack( (coordsUltFibers5, epsUltFibers5, [t]*len(coordsUltFibers5), ["concrete"]*len(coordsUltFibers5)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
             ultSummary6 = pd.DataFrame(np.column_stack( (coordsUltFibers6, epsUltFibers6, [t]*len(coordsUltFibers6), ["steel"]*len(coordsUltFibers6)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
             ultSummary = ultSummary5.append(ultSummary6)
             ultSummary.to_csv("UltimateSummary.csv", index=False)
@@ -276,3 +277,4 @@ if __name__ == "__main__":
 
     if opts["a"] == 'cyclic':
         getCyclic(opts["a"])
+
