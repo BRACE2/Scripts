@@ -1,7 +1,10 @@
 #!/bin/env python
+
+__version__ = "0.0.2"
+
 # # Synopsis
 #
-# >`render.py [<options>] <model-file>
+# >`render.py [<options>] <model-file>`
 #
 # >**Arpit Nema**, **Chrystal Chern**, and **Claudio Perez**
 # 
@@ -20,6 +23,7 @@
 # from a terminal that has python installed, in a
 # directory containing the `render.py` file. This
 # will install the following packages:
+
 
 REQUIREMENTS = """
 pyyaml
@@ -52,7 +56,7 @@ matplotlib
 NAME = "render.py"
 HELP = f"""
 usage: {NAME} <sam-file>
-       {NAME} --install
+       {NAME} --setup ...
        {NAME} [options] <sam-file>
        {NAME} [options] <sam-file> <res-file>
        {NAME} --section <py-file>#<py-object>
@@ -65,20 +69,25 @@ Positional Arguments:
                                  response.
 
 Options:
+  DISPLACEMENTS
   -s, --scale  <scale>           Set displacement scale factor.
   -d, --disp   <node>:<dof>...   Apply a unit displacement at node with tag
                                  <node> in direction <dof>.
+  VIEWING
   -V, --view   {{elev|plan|sect}}  Set camera view.
   -a, --axes   [<L><T>]<V>       Specify model axes. Only <V> is required
       --hide   <object>          Hide <object>; see '--show'.
       --show   <object>          Show <object>; accepts any of:
                                     {{origin|frames|frames.displ|nodes|nodes.displ}}
 
+  MISC.
   -o, --save   <out-file>        Save plot to <out-file>.
   -c, --conf
 
       --install                  Install script dependencies.
+      --setup                    Run setup operations.
       --script {{sam|res}}
+      --version                  Print version and exit.
   -h, --help                     Print this message and exit.
 
 
@@ -113,6 +122,7 @@ Examples:
 
 Config = lambda : {
   "show_objects": ["frames", "frames.displ", "nodes"],
+  "mode_num"    : None,
   "hide_objects": ["origin"],
   "sam_file":     None,
   "elem_by_type": False,
@@ -553,6 +563,7 @@ class PlotlyPlotter(Plotter):
             "line": {"color":props["color"]},
             "hoverinfo":"skip"
         }
+
     def make_hover_data(self, data, ln=None):
         if ln is None:
             items = np.array([d.values for d in data])
@@ -565,10 +576,20 @@ class PlotlyPlotter(Plotter):
             "customdata": list(items),
         }
 
-    def _get_nodes(self):
-        x,y,z = self.model["coord"].T[self.axes]
-        keys  = ["tag",]
-        nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
+    def _get_nodes(self, displ=None):
+        xyz = self.model["coord"].T[self.axes]
+        if not displ:
+            x,y,z = xyz
+            keys  = ["tag",]
+            nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
+        else:
+            x,y,z = xyz + np.array([displ.get(n,[0.0]*3)[:3] for n in self.model["nodes"].keys()]).T
+            keys  = ["tag","displacement", "rotation"]
+            nodes = (
+                    [node, f"{displ[node][3:]}", f"{displ[node][:3]}"]
+                for node in self.model["nodes"].keys()
+            )
+            
         return {
                 "name": "nodes",
                 "x": x, "y": y, "z": z,
@@ -619,12 +640,12 @@ class PlotlyPlotter(Plotter):
 def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
-    if opts["elems_by_type"]:
+    if opts["elem_by_type"]:
         frames = plt._get_frames()
     else:
         frames = plt._get_frames()
     labels = plt._get_frame_labels()
-    nodes = plt._get_nodes()
+    nodes = plt._get_nodes(displ=displ)
     fig = go.Figure(dict(
             #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
             data=[*frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
@@ -667,10 +688,16 @@ def parse_args(argv)->dict:
             elif arg == "--gnu":
                 opts["plotter"] = "gnu"
 
+            elif arg == "--plotly":
+                opts["plotter"] = "plotly"
+
             elif arg == "--install":
                 try: install_me(next(args))
                 # if no directory is provided, use default
                 except StopIteration: install_me()
+                sys.exit()
+            elif arg == "--version":
+                print(__version__)
                 sys.exit()
 
             elif arg[:2] == "-d":
@@ -704,8 +731,8 @@ def parse_args(argv)->dict:
             elif arg == "--elem-by-type":
                 opts["elem_by_type"] = True
 
-            #elif arg[:2] == "-m":
-            #    opts["mode"] = int(arg[2]) if len(arg) > 2 else int(next(args))
+            elif arg[:2] == "-m":
+                opts["mode_num"] = int(arg[2]) if len(arg) > 2 else int(next(args))
 
             elif arg[:2] == "-o":
                 opts["write_file"] = arg[2:] if len(arg) > 2 else next(args)
@@ -745,7 +772,7 @@ def install_me(install_opt=None):
     print(sys.argv)
 
     setup(name="render",
-          version="0.0.1",
+          version=__version__,
           description="",
           long_description=HELP,
           author="", author_email="", url="",
@@ -778,11 +805,9 @@ def render(sam_file, res_file=None, **opts):
         GnuPlotter(model, axes).plot_frames()
         sys.exit()
 
-    #for obj in opts["show_objects"]:
-    #    plt[obj]
-
-    ax = plot_skeletal(model,axes=axes)
-       
+    #
+    # Handle displacements
+    #
     if res_file is not None:
         from urllib.parse import urlparse
         res_path = urlparse(res_file)
@@ -790,9 +815,12 @@ def render(sam_file, res_file=None, **opts):
             res = yaml.load(f,Loader=yaml.Loader)
         if res_path[4]: # query parameters passed
             res = res[int(res_path[4].split("=")[-1])]
+        elif opts["mode_num"]: # query parameters passed
+            res = res[int(opts["mode_num"])]
 
     else:
         res = {}
+
     for n,d in opts["displ"]:
         v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
         if d < 3: # translational dof
@@ -808,14 +836,6 @@ def render(sam_file, res_file=None, **opts):
                 n[i] *= scale
 
 
-    ax = plot_nodes(model, res, ax=ax, axes=axes)
-    if res:
-        plot_displ(model, res, axes=axes, ax=ax)
-
-    # Handle plot formatting
-    set_axis_limits(ax)
-    ax.view_init(**VIEWS[opts["view"]])
-    if "origin" in opts["show_objects"]: add_origin(ax, scale)
 
     if opts["write_file"]:
     # write plot to file if file name provided
@@ -828,11 +848,26 @@ def render(sam_file, res_file=None, **opts):
                 f.write(html)
         else:
             ax.figure.savefig(opts["write_file"])
+    elif opts["plotter"] == "plotly":
+        fig = plot_plotly(model,axes,displ=res,opts=opts)
+        fig.show(renderer="browser")
+
     else:
-    # otherwise show in new window
+        # Matplotlib
+        ax = plot_skeletal(model, axes=axes)
+        ax = plot_nodes(model, res, ax=ax, axes=axes)
+
+        if res:
+            plot_displ(model, res, axes=axes, ax=ax)
+
+        # Handle plot formatting
+        set_axis_limits(ax)
+        ax.view_init(**VIEWS[opts["view"]])
+        if "origin" in opts["show_objects"]: add_origin(ax, scale)
+
         import matplotlib.pyplot as plt
         plt.show()
-    return ax
+        return ax
 
 # Main script
 #----------------------------------------------------
@@ -859,7 +894,5 @@ if __name__ == "__main__":
         exec(script, scope)
         plt = MplPlotter()
         plt.plot_section(scope[file.fragment])
-
-
 
 

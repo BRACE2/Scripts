@@ -194,7 +194,7 @@ def srim(
     """
     dt = to = config.get("dt", None) or dati["time_step"]
     p = config.get("p", 5)         # # steps used for the identification. Referred to as the prediction horizon in literature
-    n = n1 = config.get("orm", 4)  # Order of the model.
+    n = n1 = config.get("orm", config.get("order",4))  # Order of the model.
 
     if issubclass(dati.__class__, dict):
         dati = dati.data
@@ -470,7 +470,6 @@ if __name__ == "__main__":
         #"dn" : npoints - 1,
         "orm":  4
     }
-    print(inputs.__class__)
     A,B,C,D = srim(inputs, outputs, **configsrim)
     freqdmpSRIM, modeshapeSRIM, *_ = ComposeModes(dt, A, B, C, D)
     print(1/freqdmpSRIM[:,0])
