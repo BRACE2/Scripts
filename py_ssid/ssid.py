@@ -27,9 +27,41 @@ tqdm
 quakeio
 """
 
-HELP = """```
-ssid <event>
-```"""
+HELP = """
+ssid [-p|w <>...] <method> <event> <inputs> <outputs>
+ssid [-p|w <>...] <method> -i <inputs> -o <outputs>
+
+Methods:
+  <method> <outputs>  <plots>
+    srim    {dftmcs}   {m}
+    okid    {dftmcs}   {m}
+    spec    {ft}       {a}
+    four    {ft}       {a}
+    test
+
+-i/--inputs          FILE...
+-o/--outputs         FILE...
+
+-s/--system-matrix
+    abcd
+
+-p/--plot
+    a/--accel-spect
+-w/--write
+    ABCD   system matrices
+    d      damping
+    f      frequency
+    t      period
+    m      modes
+    c      condition-number
+"""
+
+EXAMPLES="""
+    ssid srim -wABCD event.zip 2,3 4,5
+    ssid okid -pm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
+    ssid okid -wm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
+"""
+
 #
 # Distribution Utilities
 #
@@ -109,7 +141,6 @@ def ComposeModes(dt, A, B, C, D):
         if (freq1[i] == freq1[i+1]) or (freq1[i] == freq1[i-1]):
             roots.append(i)
  
-
     # b) Determination of damping ratios (Eqs. 3.46 & 3.39)
     damp1 = -np.real(sj1)/(2*pi*freq1)
     # Represent the identified frequency & damping information
@@ -139,9 +170,15 @@ def ComposeModes(dt, A, B, C, D):
     return freqdmp, modeshape, sj1, v, d
 
 
+#
+# SRIM
+#
 
 def _blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
+
+def parse_srim(args):
+    pass
 
 def srim(
     dati,
@@ -193,7 +230,7 @@ def srim(
 
     """
     dt = to = config.get("dt", None) or dati["time_step"]
-    p = config.get("p", 5)         # # steps used for the identification. Referred to as the prediction horizon in literature
+    p = config.get("p", 5)         # # steps used for the identification (ie, prediction horizon)
     n = n1 = config.get("orm", config.get("order",4))  # Order of the model.
 
     if issubclass(dati.__class__, dict):
@@ -431,10 +468,10 @@ if __name__ == "__main__":
     from pathlib import Path
     channels = [[17, 3, 20], [9, 7, 4]]
 
-    if len(sys.argv) < 2:
+    if sys.argv[1] == "test":
         data_dir = Path("RioDell_Petrolia_Processed_Data")
 
-        first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.v2")
+        first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.V2")
         npoints = len(first_input.accel.data)
         inputs, outputs = np.zeros((2,npoints,len(channels[0])))
 
@@ -452,6 +489,9 @@ if __name__ == "__main__":
     else:
         if sys.argv[1] == "--setup":
             install_me()
+            sys.exit()
+        elif sys.argv[1] == "--help":
+            print(HELP)
             sys.exit()
 
         event = quakeio.read(sys.argv[-1])
