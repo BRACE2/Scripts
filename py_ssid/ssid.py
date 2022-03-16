@@ -28,15 +28,40 @@ quakeio
 """
 
 HELP = """
-ssid <method> <event>
+ssid [-p|w <>...] <method> <event> <inputs> <outputs>
+ssid [-p|w <>...] <method> -i <inputs> -o <outputs>
 
-<method>
-    stfe           Spectral transfer function estimate
-    ftfe           Fourier transfer function estimate
-    okid
-    srim           System realization w/ information matrix
+Methods:
+  <method> <outputs>  <plots>
+    srim    {dftmcs}   {m}
+    okid    {dftmcs}   {m}
+    spec    {ft}       {a}
+    four    {ft}       {a}
+    test
 
+-i/--inputs          FILE...
+-o/--outputs         FILE...
+
+-s/--system-matrix
+    abcd
+
+-p/--plot
+    a/--accel-spect
+-w/--write
+    ABCD   system matrices
+    d      damping
+    f      frequency
+    t      period
+    m      modes
+    c      condition-number
 """
+
+EXAMPLES="""
+    ssid srim -wABCD event.zip 2,3 4,5
+    ssid okid -pm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
+    ssid okid -wm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
+"""
+
 #
 # Distribution Utilities
 #
@@ -157,9 +182,11 @@ def ftfe(dati, dato, **config):
 #
 # SRIM
 #
-
 def _blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
+
+def parse_srim(args):
+    pass
 
 def srim(
     dati,
@@ -214,7 +241,7 @@ def srim(
     # Convenience argument handling
     #
     dt = to = config.get("dt", None) or dati["time_step"]
-    p = config.get("p", 5)         # # steps used for the identification. Referred to as the prediction horizon in literature
+    p = config.get("p", 5)         # # steps used for the identification (ie, prediction horizon)
     n = n1 = config.get("orm", config.get("order",4))  # Order of the model.
 
     assert p > n/m + 1
@@ -461,10 +488,10 @@ if __name__ == "__main__":
     from pathlib import Path
     channels = [[17, 3, 20], [9, 7, 4]]
 
-    if len(sys.argv) < 2:
+    if sys.argv[1] == "test":
         data_dir = Path("RioDell_Petrolia_Processed_Data")
 
-        first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.v2")
+        first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.V2")
         npoints = len(first_input.accel.data)
         inputs, outputs = np.zeros((2,npoints,len(channels[0])))
 
@@ -482,6 +509,9 @@ if __name__ == "__main__":
     else:
         if sys.argv[1] == "--setup":
             install_me()
+            sys.exit()
+        elif sys.argv[1] == "--help":
+            print(HELP)
             sys.exit()
         else:
             options = parse_args(sys.argv)
@@ -502,8 +532,7 @@ if __name__ == "__main__":
         #"dn" : npoints - 1,
         "orm":  4
     }
+
     A,B,C,D = srim(inputs, outputs, **configsrim)
     freqdmpSRIM, modeshapeSRIM, *_ = ComposeModes(dt, A, B, C, D)
     print(1/freqdmpSRIM[:,0])
-
-

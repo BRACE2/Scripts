@@ -2,6 +2,20 @@
 
 <details>
 <summary>
+<a href="render_sam">render_sam</a> : Structure renderer.
+</summary>
+  Contributors: Arpit Nema, Chrystal Chern, @claudioperez
+</details>
+
+<details>
+<summary>
+<a href="system_identification">system_identification</a> MATLAB system identification tools.
+</summary>
+  Contributors: Prof. Mosalam, @claudioperez
+</details>
+
+<details>
+<summary>
 [csmip-tables](csmip-tables)
 </summary>
   Contributors: @claudioperez
