@@ -27,9 +27,16 @@ tqdm
 quakeio
 """
 
-HELP = """```
-ssid <event>
-```"""
+HELP = """
+ssid <method> <event>
+
+<method>
+    stfe           Spectral transfer function estimate
+    ftfe           Fourier transfer function estimate
+    okid
+    srim           System realization w/ information matrix
+
+"""
 #
 # Distribution Utilities
 #
@@ -108,7 +115,6 @@ def ComposeModes(dt, A, B, C, D):
     for i in range(2, n-2):
         if (freq1[i] == freq1[i+1]) or (freq1[i] == freq1[i-1]):
             roots.append(i)
- 
 
     # b) Determination of damping ratios (Eqs. 3.46 & 3.39)
     damp1 = -np.real(sj1)/(2*pi*freq1)
@@ -138,7 +144,19 @@ def ComposeModes(dt, A, B, C, D):
 
     return freqdmp, modeshape, sj1, v, d
 
+#
+# TFE
+#
+def stfe(dati, dato, **config):
+    pass
 
+def ftfe(dati, dato, **config):
+    "Fourier transfer function estimate"
+    pass
+
+#
+# SRIM
+#
 
 def _blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
@@ -192,9 +210,14 @@ def srim(
     same orm in OKID-ERA-DC is used. It can be changed if needed.
 
     """
+    #
+    # Convenience argument handling
+    #
     dt = to = config.get("dt", None) or dati["time_step"]
     p = config.get("p", 5)         # # steps used for the identification. Referred to as the prediction horizon in literature
     n = n1 = config.get("orm", config.get("order",4))  # Order of the model.
+
+    assert p > n/m + 1
 
     if issubclass(dati.__class__, dict):
         dati = dati.data
@@ -425,6 +448,13 @@ def srim(
 ###%KKKKK
 ##    return freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM
 
+def parse_args(argv):
+    argi = iter(argv[1:])
+    assert argv[1] in ["srim", "stfe", "ftfe", "okid"]
+    for arg in argi:
+        if arg == "":
+            pass
+
 if __name__ == "__main__":
     import sys
     import quakeio
@@ -453,6 +483,8 @@ if __name__ == "__main__":
         if sys.argv[1] == "--setup":
             install_me()
             sys.exit()
+        else:
+            options = parse_args(sys.argv)
 
         event = quakeio.read(sys.argv[-1])
         inputs = np.array([
