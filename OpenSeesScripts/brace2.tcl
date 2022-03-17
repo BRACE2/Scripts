@@ -7,6 +7,7 @@ namespace eval brace2 {
   set this_namespace brace2::
   source [file join $dir ResponseHistoryLib.tcl]
   source [file join $dir StaticAnalysis.tcl]
+  source [file join $dir EigenvalueAnalysis.tcl]
   source [file join $dir ColSectionLib.tcl]
   namespace eval io {
     source [file join $dir LibIO.tcl]

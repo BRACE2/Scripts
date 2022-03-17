@@ -3,6 +3,14 @@
 #
 #   pip install quakeio
 #
+
+proc lshift listVar {
+    upvar 1 $listVar l
+    set r [lindex $l 0]
+    set l [lreplace $l [set l 0] 0]
+    return $r
+}
+
 proc rayleigh_alpha {eigi eigj {lambdaN 0}} {
   set pi      [expr acos(-1.0)];
   set nEigenI [lindex $eigi 0];
@@ -48,7 +56,7 @@ proc read_quake {tag file channel args} {
     }
     # Call parser
     array set series [
-      exec quakeio -t tcl $file -m station_channel:l=$channel
+      exec quakeio -t tcl $file -m station_channel:l=$channel {*}$args
     ]
 
 	  timeSeries Path $tag -dt $series(dt) -values $series(values)
@@ -86,6 +94,7 @@ proc read_quake {tag file channel args} {
     method pattern {args} {
         switch -glob -- [lindex "$args" 0] {
             UniformQuake  {
+              set args [uplevel 2 "subst {$args}"]
               set args [lassign $args - dof]
               lassign [brace2::read_quake $current_series_tag {*}$args] num_steps dt
               pattern UniformExcitation $current_pattern_tag $dof -accel $current_series_tag
@@ -103,16 +112,31 @@ proc read_quake {tag file channel args} {
       foreach pat [split $pats "\n"] {my pattern {*}$pat}
     }
 
-    method analyze {{n 0}} {
-      if {!$n} {set n $num_steps}
-      puts "analyzing $n steps"
+    method print {} {
+      puts "Time step:   $dt"
+      puts "Record size: $num_steps"
+    }
+
+    method analyze {args} {
+      lassign [list $num_steps $dt] n dt
+      set pos_args {n dt}
+      while {[llength $args]} {
+        switch -glob -- [lindex "$args" 0] {
+          -n* {set args [lassign $args - n]}
+          -dt {set args [lassign $args - dt]}
+          *   {set args [lassign $args [lshift $pos_args]]}
+        }
+      }
+      # if {![info exists n]} {set n $num_steps}
+      # if {![info exists dt]} {set dt $dt}
+      puts "analyzing $n steps with increment $dt"
       analysis Transient;
       for {set ik 1} {$ik <= $n} {incr ik 1} {
-          if {[my step] != 0} {return $ik}
+          if {[my step $dt] != 0} {return $ik}
       }
     }
 
-    method step {} {
+    method step {dt} {
       foreach alg "
         $algorithm
         {NewtonLineSearch -type Bisection}

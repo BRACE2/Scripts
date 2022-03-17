@@ -1,9 +1,5 @@
 __doc__="""
-# `ssid` : Structural System Identification
-
-- SRIM
-- OKID
-
+# ssid : Structural System Identification
 """
 # Standard library
 import sys
@@ -31,6 +27,9 @@ HELP = """
 ssid [-p|w <>...] <method> <event> <inputs> <outputs>
 ssid [-p|w <>...] <method> -i <inputs> -o <outputs>
 
+-i/--inputs  FILE...   Input data
+-o/--outputs FILE...   Output data
+
 Methods:
   <method> <outputs>  <plots>
     srim    {dftmcs}   {m}
@@ -39,18 +38,14 @@ Methods:
     four    {ft}       {a}
     test
 
--i/--inputs          FILE...
--o/--outputs         FILE...
-
--s/--system-matrix
-    abcd
-
+Outputs options
 -p/--plot
     a/--accel-spect
 -w/--write
     ABCD   system matrices
     d      damping
-    f      frequency
+    freq   frequency
+    cycl   cyclic frequency
     t      period
     m      modes
     c      condition-number
@@ -61,6 +56,28 @@ EXAMPLES="""
     ssid okid -pm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
     ssid okid -wm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
 """
+
+def parse_args(args):
+    outputs = []
+    parsers = {
+        "srim": parse_srim,
+        "test": parse_srim,
+        "okid": parse_okid
+    }
+    config = {}
+    argi = iter(args[1:])
+    for arg in argi:
+        if arg == "-p":
+            outputs.append(next(arg))
+        if arg == "--setup":
+            install_me()
+            sys.exit()
+        elif arg in ["--help", "-h"]:
+            print(HELP)
+            sys.exit()
+        else:
+            config["method"] = arg
+            return parsers[arg](argi, config), outputs
 
 #
 # Distribution Utilities
@@ -166,19 +183,46 @@ def ComposeModes(dt, A, B, C, D):
         om  = np.argmax(abs(np.real(modeshape[:,q])))
         mx  = abs(np.real(modeshape[om,q]))
         modeshape[:,q] = np.real(modeshape[:,q])/mx*sign(np.real(modeshape[om,q]))
-
     return freqdmp, modeshape, sj1, v, d
 
+#
+# OKID_ERA_DC
+#
+def parse_okid(args, config):
+    """
+    p determines order of the observer Kalman ARX filter used in OKID-ERA-DC.
+    n determines size of the state-space model used for representing the system.
+    """
+    return config
 
 #
 # SRIM
 #
-
 def _blk_3(i, CA, U):
     return i, np.einsum('kil,klj->ij', CA[:i,:,:], U[-i:,:,:])
 
-def parse_srim(args):
-    pass
+def parse_srim(argi, config):
+    help="""
+    SRIM -- System Identification with Information Matrix
+
+    Parameters
+    p           order of the observer Kalman ARX filter.
+    n           size of the state-space model used for 
+                representing the system.
+    """
+    config.update({"p"  :  5, "orm":  4})
+    #argi = iter(args)
+    for arg in argi:
+        if arg == "-p":
+            config["p"] = int(next(argi))
+        if arg == "--dt":
+            config["dt"] = float(next(argi))
+        if arg == "-n":
+            config["orm"] = int(next(argi))
+        if arg in ["--help", "-h"]:
+            print(help)
+            sys.exit()
+    return config
 
 def srim(
     dati,
@@ -189,6 +233,9 @@ def srim(
     **config
 ):
     """
+    mro $(p)$ determines order of the observer Kalman ARX filter used in OKID-ERA-DC.
+    orm $(n)$ determines size of the state-space model used for representing the system.
+
     Returns
     =======
      freqdampSRIM:
@@ -230,14 +277,13 @@ def srim(
 
     """
     dt = to = config.get("dt", None) or dati["time_step"]
-    p = config.get("p", 5)         # # steps used for the identification (ie, prediction horizon)
-    n = n1 = config.get("orm", config.get("order",4))  # Order of the model.
+    p = config.get("p")         # # steps used for the identification (ie, prediction horizon)
+    n = n1 = config.get("n", config.get("orm"))  # Order of the model.
 
     if issubclass(dati.__class__, dict):
         dati = dati.data
     if issubclass(dato.__class__, dict):
         dato = dato.data
-
     if len(dati.shape) < 2:
         dati = np.atleast_2d(dati).T
     if len(dato.shape) < 2:
@@ -259,6 +305,9 @@ def srim(
     l,m = dato.shape # m is the number of output channels
     _,r = dati.shape # r is the number of input channels
 
+
+    assert p >= n/m + 1
+
     ypS = np.zeros((m*p,nsizS))
     upS = np.zeros((r*p,nsizS))
 
@@ -276,12 +325,15 @@ def srim(
     Ruu = upS@upS.T/nsizS
     Ruy = upS@ypS.T/nsizS
 
+    assert Ryy.shape[0] == Ryy.shape[1] == p*m
+    assert Ruy.shape[0] == p*r
+    assert Ruy.shape[1] == p*m
+
     # Compute the correlation matrix (Eq. 3.69)
     Rhh = Ryy - Ruy.T@linsolve(Ruu,Ruy)
 
     # 2c. Obtain observability matrix using full or partial decomposition 
     #     (Eqs. 3.72 & 3.74).
-    #
     if full:
         # Full Decomposition Method
         un,*_ = np.linalg.svd(Rhh,0)           # Eq. 3.74
@@ -350,6 +402,7 @@ def srim(
     for ww in range(r):
         B[:,ww] = bcol[ww*n:(ww+1)*n]
 
+    assert A.shape[0] == A.shape[1] == n
     return A,B,C,D
 
 #PY
@@ -467,8 +520,11 @@ if __name__ == "__main__":
     import quakeio
     from pathlib import Path
     channels = [[17, 3, 20], [9, 7, 4]]
+    method = None
 
-    if sys.argv[1] == "test":
+    config, out_ops = parse_args(sys.argv)
+
+    if config["method"] == "test":
         data_dir = Path("RioDell_Petrolia_Processed_Data")
 
         first_input = quakeio.read(data_dir/f"CHAN{channels[0][0]:03d}.V2")
@@ -485,16 +541,10 @@ if __name__ == "__main__":
             outputs[:,i] = quakeio.read(data_dir/f"CHAN{inp:03d}.V2").accel.data
 
         dt = first_input.accel["time_step"]
+        config["dt"] = dt
 
-    else:
-        if sys.argv[1] == "--setup":
-            install_me()
-            sys.exit()
-        elif sys.argv[1] == "--help":
-            print(HELP)
-            sys.exit()
-
-        event = quakeio.read(sys.argv[-1])
+    elif "event_file" in config:
+        event = quakeio.read(config["event_file"])
         inputs = np.array([
             event.at(file_name=f"CHAN{i:03d}.V2").accel.data for i in channels[0]
         ]).T
@@ -503,15 +553,19 @@ if __name__ == "__main__":
         ]).T
         npoints = len(inputs[:,0])
         dt = event.at(file_name=f"CHAN{channels[0][0]:03d}.V2").accel["time_step"]
+        config["dt"] = dt
 
-    configsrim = {
-        "p"  :  5,
-        "dt" : dt,
-        #"dn" : npoints - 1,
-        "orm":  4
-    }
-    A,B,C,D = srim(inputs, outputs, **configsrim)
+    print(config)
+
+    A,B,C,D = srim(inputs, outputs, **config)
+
     freqdmpSRIM, modeshapeSRIM, *_ = ComposeModes(dt, A, B, C, D)
-    print(1/freqdmpSRIM[:,0])
+
+    if not out_ops:
+        print(f"period: {np.real(1/freqdmpSRIM[:,0])}")
+    elif "freq" in out_ops:
+        print(f"frequency: {freqdmpSRIM[:,0]}")
+    elif "cycl" in out_ops:
+        print(f"cyclic_frequency: {2*np.pi*freqdmpSRIM[:,0]}")
 
 
