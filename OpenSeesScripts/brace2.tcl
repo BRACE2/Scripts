@@ -1,8 +1,11 @@
 package provide brace2 0.1
+# Modeling utilities for the BRACE2 project
+# Authors:
+#   Crystal Chern
+#   Claudio Perez
 
 set dir [file dirname [file normalize [info script]]]
 
-# Create the namespace
 namespace eval brace2 {
   set this_namespace brace2::
   source [file join $dir ResponseHistoryLib.tcl]
@@ -11,6 +14,17 @@ namespace eval brace2 {
   source [file join $dir ColSectionLib.tcl]
   namespace eval io {
     source [file join $dir LibIO.tcl]
+  }
+  proc new {type {name ""} args} {
+    if {[string match "-*" $name]} {
+      set cmd "brace2::$type new $name"
+      uplevel 1 "$cmd"
+    } elseif {$name eq ""} {
+      $type new {*}$args
+    } else {
+      #set cmd "brace2::$type create $name "
+      uplevel 1 "brace2::$type create $name {*}{$args}"
+    }
   }
 }
 source [file join $dir ReadMPR.tcl]

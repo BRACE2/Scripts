@@ -30,10 +30,10 @@
     set nodeList [getNodeTags]
     # Initialize variables `omega`, `f` and `T` to
     # empty lists.
-    foreach {omega f T} {{} {} {}} {}
+    foreach {omega f T recorders} {{} {} {} {}} {} 
 
     for {set k 1} {$k <= $options(-numModes)} {incr k} {
-      recorder Node -node {*}$nodeList -dof {*}$DOFs "eigen $k";
+      lappend recorders [recorder Node -node {*}$nodeList -dof {*}$DOFs "eigen $k";]
     }
 
     set eigenvals [eigen $options(-numModes)];
@@ -47,20 +47,17 @@
 
     # print info to `stdout`.
     if {$options(-verbose)} {
-      puts "Angular frequency (rad/s): \t$omega\n";
-      puts "Frequency (Hz): \t$f\n";
-      puts "Periods (sec): \t$T\n";
+      puts "Angular frequency (rad/s): $omega\n";
+      puts "Frequency (Hz):            $f\n";
+      puts "Periods (sec):             $T\n";
     }
 
     if {$options(-file) != 0} {
-      set mode_file [open $options(-file) w+]
+      brace2::io::write_modes $options(-file) $options(-numModes)
     }
 
-    for {set m 1} {$m <= 3} {incr m} {
-      puts $mode_file "$m:"
-      foreach n "$nodeList" {
-        puts $mode_file "  $n: \[[join [nodeEigenvector $n $m] {, }]\]";
-      }
+    foreach recorder $recorders {
+      remove recorder $recorder
     }
   }
 }

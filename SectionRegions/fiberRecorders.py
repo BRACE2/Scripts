@@ -25,7 +25,7 @@ def damage_states(Dcol):
         "dsr1" : {
             "regions": [
                  # external radius    internal radius
-                section.PolygonRing(8, Rcol,         Rcol-1)
+                section.PolygonRing(8, Rcol,         Rcol-coverl/4)
             ]
         },
         "dsr2" : {
@@ -35,7 +35,7 @@ def damage_states(Dcol):
         },
         "dsr3" : {
             "regions": [
-                section.PolygonRing(8, Rcol-coverl/2+0.25, Rcol-3*coverl/4-0.25)
+                section.PolygonRing(8, Rcol-cover/2, Rcol-3*cover/4)
             ],
             "material": "*concr*"
         },
@@ -61,7 +61,7 @@ def damage_states(Dcol):
             ],
             "material": "*steel*"
         },
-        "all" : {
+        "all": {
             "regions": [
                 section.ConfinedPolygon(8, Rcol)
             ]

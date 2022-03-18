@@ -1,8 +1,18 @@
-# Claudio Perez
+#
+#   Chrystal Chern
+#   Claudio Perez
+#
 # To install dependencies, run
 #
 #   pip install quakeio
 #
+# Overview
+#   proc read_quake {tag file channel args}
+#       Parse motion and create a time series
+#
+#   class ResponseHistory
+#     method patterns {patterns}
+#     method analyze <steps> <dt>
 
 proc lshift listVar {
     upvar 1 $listVar l
@@ -59,7 +69,7 @@ proc read_quake {tag file channel args} {
       exec quakeio -t tcl $file -m station_channel:l=$channel {*}$args
     ]
 
-	  timeSeries Path $tag -dt $series(dt) -values $series(values)
+	  timeSeries Path $tag -dt $series(dt) -values $series(values) -factor $options(-scale)
     return [list $series(shape) $series(dt)]
 }
 
@@ -70,6 +80,7 @@ proc read_quake {tag file channel args} {
     variable current_pattern_tag
     variable num_steps
     variable dt
+    variable final_time
 
     constructor {args} {
         set current_pattern_tag 1
@@ -97,6 +108,7 @@ proc read_quake {tag file channel args} {
               set args [uplevel 2 "subst {$args}"]
               set args [lassign $args - dof]
               lassign [brace2::read_quake $current_series_tag {*}$args] num_steps dt
+              set final_time [expr {$num_steps*$dt}]
               pattern UniformExcitation $current_pattern_tag $dof -accel $current_series_tag
               incr current_pattern_tag
               incr current_series_tag
@@ -124,7 +136,7 @@ proc read_quake {tag file channel args} {
         switch -glob -- [lindex "$args" 0] {
           -n* {set args [lassign $args - n]}
           -dt {set args [lassign $args - dt]}
-          *   {set args [lassign $args [lshift $pos_args]]}
+          *   {set args [lassign $args [brace2::lshift pos_args]]}
         }
       }
       # if {![info exists n]} {set n $num_steps}
