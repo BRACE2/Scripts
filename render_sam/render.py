@@ -651,19 +651,20 @@ def plot_plotly(model, axes=None, displ=None, opts={}):
             nodes = plt._get_nodes(displ=mode_shape)
             for data in [*frames, labels, nodes, plt._get_displ(mode_shape)]:
                 fig.add_trace(data, row = i+1, col = 1)
-            #fig.update_layout(
-            #    go.Layout(
-            #        scene=dict(aspectmode='data',
-            #             xaxis_visible=False,
-            #             yaxis_visible=False,
-            #             zaxis_visible=False,
-            #             camera=dict(
-            #                 projection={"type": opts["camera"]["projection"]}
-            #             )
-            #        ),
-            #        showlegend=False
-            #    )
-            #)
+            fig.update_layout(
+                go.Layout(
+                    **{f"scene{i+1}": dict(aspectmode='data',
+                         xaxis_visible=False,
+                         yaxis_visible=False,
+                         zaxis_visible=False,
+                         camera=dict(
+                             projection={"type": opts["camera"]["projection"]}
+                         )
+                        )
+                    },
+                    showlegend=False
+                )
+            )
     else:
         nodes = plt._get_nodes(displ=displ)
         fig = go.Figure(dict(
