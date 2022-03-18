@@ -90,6 +90,29 @@ def iter_elem_fibers(model:dict, elements:list, sections: list=(0,-1), filt:dict
                     for s,f in iter_section_fibers(model, s, filt):
                         yield el,idx+1,f
 
+                        
+                        
+def iter_elem_strains(model, el, s, recorder_data):
+    sam = model["StructuralAnalysisModel"]
+    model["sections"] = {
+        str(s["name"]): s for s in sam["properties"]["sections"]
+    }
+    model["materials"] = {
+        str(m["name"]): m for m in sam["properties"]["uniaxialMaterials"]
+    }
+    for el in sam["geometry"]["elements"]:
+        if el["name"] in elements and "sections" in el:
+            #for tag in el["sections"]:
+            for i in sections:
+                idx = len(el["sections"]) - 1 if i==-1 else i
+                tag = el["sections"][idx]
+                s = model["sections"][tag]
+                if "section" in s:
+                    s = model["sections"][s["section"]]
+                    for s,f in iter_section_fibers(model, s, filt):
+                        yield el,idx+1,f
+
+    
 def iter_section_fibers(model, s, filt=None):
     if filt is not None:
         if "material" not in filt:
@@ -107,6 +130,7 @@ def iter_section_fibers(model, s, filt=None):
         for fiber in s["fibers"]:
             yield s,fiber
 
+    
 def print_fiber(c, s, base_cmd, options):
     out_file = options["record_file"] +f"_{s}" + "_" + str(c[0]) + "_" + str(c[1]) + ".txt"
     base_cmd = base_cmd.format(fmt=options["format"],out_file=out_file)
@@ -115,6 +139,50 @@ def print_fiber(c, s, base_cmd, options):
     if options["logging"]:
         print("puts \""+fiber_cmd+"\"")
 
+        
+def getDictData(allData, curDict):
+    "Arpit Nema"
+    if type(curDict) == dict:
+        for key in curDict.keys():
+            if type(curDict[key]) == dict:
+                getDictData(allData, curDict[key])
+            else:
+                if type(curDict[key]) == int:
+                    curDict[key] = allData[:, curDict[key]]
+                    
+def read_sect_xml(xml_file):
+    "Arpit Nema"
+    import xml.etree.ElementTree as ET
+    with open(xml_file) as f:
+        xml_data = f.read()
+    root = ET.XML(xml_data)  # Parse XML
+
+    hdrs = []
+    dataDict = {}
+    colCtr = 0
+    for i, child in enumerate(root):
+        if child.tag == "TimeOutput":
+            hdrs.append(child[0].text)
+            dataDict[child[0].text] = colCtr
+            colCtr += 1
+        if child.tag == "ElementOutput":
+            eleKey = child.attrib["eleTag"]
+            secKey = child[0].attrib["number"]
+            hdrPre = eleKey + "_" + secKey + "_" + child[0][0].attrib["secTag"]
+
+            dataDict[eleKey] = {secKey: {}}
+            for respCtr in range(len(child[0][0])):
+                hdrs.append(hdrPre + "_" + child[0][0][respCtr].text)
+                respKey = child[0][0][respCtr].text
+                if respKey in dataDict[eleKey][secKey].keys():
+                    respKey = respKey + "_"
+                dataDict[eleKey][secKey][respKey] = colCtr
+                colCtr += 1
+        if child.tag == "Data":
+            tmp = child.text
+    data = np.array(tmp.replace("\n", "").split(), dtype=float).reshape((-1, len(hdrs)))
+    getDictData(data, dataDict)
+    return dataDict
 
 def print_help():
     print(HELP)
