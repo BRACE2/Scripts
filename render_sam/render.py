@@ -639,28 +639,48 @@ class PlotlyPlotter(Plotter):
 
 def plot_plotly(model, axes=None, displ=None, opts={}):
     import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
-    if opts["elem_by_type"]:
-        frames = plt._get_frames()
-    else:
-        frames = plt._get_frames()
+    frames = plt._get_frames()
     labels = plt._get_frame_labels()
-    nodes = plt._get_nodes(displ=displ)
-    fig = go.Figure(dict(
-            #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
-            data=[*frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
-            layout=go.Layout(
-                scene=dict(aspectmode='data',
-                     xaxis_visible=False,
-                     yaxis_visible=False,
-                     zaxis_visible=False,
-                     camera=dict(
-                         projection={"type": opts["camera"]["projection"]}
-                     )
-                ),
-                showlegend=False
-            )
-        ))
+    if opts["mode_num"] is None and displ is not None:
+        nrows = len(displ)
+        fig = make_subplots(rows=nrows, cols=1, specs=[[{"type": "scene"}]]*len(displ))
+        for i, (mode_num, mode_shape) in enumerate(displ.items()):
+            nodes = plt._get_nodes(displ=mode_shape)
+            for data in [*frames, labels, nodes, plt._get_displ(mode_shape)]:
+                fig.add_trace(data, row = i+1, col = 1)
+            #fig.update_layout(
+            #    go.Layout(
+            #        scene=dict(aspectmode='data',
+            #             xaxis_visible=False,
+            #             yaxis_visible=False,
+            #             zaxis_visible=False,
+            #             camera=dict(
+            #                 projection={"type": opts["camera"]["projection"]}
+            #             )
+            #        ),
+            #        showlegend=False
+            #    )
+            #)
+    else:
+        nodes = plt._get_nodes(displ=displ)
+        fig = go.Figure(dict(
+                #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
+                data=[*frames, labels, nodes] + ([plt._get_displ(displ)] if displ else []),
+                layout=go.Layout(
+                    scene=dict(aspectmode='data',
+                         xaxis_visible=False,
+                         yaxis_visible=False,
+                         zaxis_visible=False,
+                         camera=dict(
+                             projection={"type": opts["camera"]["projection"]}
+                         )
+                    ),
+                    showlegend=False
+                )
+            ))
     return fig
 
 # Script functions
@@ -821,6 +841,7 @@ def render(sam_file, res_file=None, **opts):
     else:
         res = {}
 
+
     for n,d in opts["displ"]:
         v = res.setdefault(n,[0.0]*model["nodes"][n]["ndf"])
         if d < 3: # translational dof
@@ -831,9 +852,16 @@ def render(sam_file, res_file=None, **opts):
     # apply scale
     scale = opts["scale"]
     if scale != 1.0:
-        for n in res.values():
-            for i in range(len(n)):
-                n[i] *= scale
+        if opts["mode_num"] is None:
+            if scale != 1.0:
+                for shp in res.values():
+                    for n in shp.values():
+                        for i in range(len(n)):
+                            n[i] *= scale
+        else:
+            for n in res.values():
+                for i in range(len(n)):
+                    n[i] *= scale
 
 
 
