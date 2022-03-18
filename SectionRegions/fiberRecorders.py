@@ -6,9 +6,10 @@ HELP = """
 python -m fiberRecorders model.json output.txt -d Dcol -e E... -l STATE
 
 Options
--file | -xml
--logging <int>
--d[iameter] <float>
+-file | -xml            output file name
+-logging <int>          logging flag
+-d <float>              section diameter
+-s <int>,[<int>]        section tag range
 
 To install run:
     python fiberRecorders.py --setup develop
@@ -160,7 +161,7 @@ def parse_args(args)->dict:
             install_me()
             sys.exit()
 
-        if arg[:2] == "-h":
+        if arg in ["--help","-h"]:
             print_help()
             sys.exit()
 
