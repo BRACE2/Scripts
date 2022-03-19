@@ -1,14 +1,15 @@
+#!/usr/bin/env python 
 # Chrystal Chern cchern@berkeley.edu
 
+import json
 import os, re, sys
 import numpy as np
 import pandas as pd
-import json
 from matplotlib import pyplot as plt
 from matplotlib import animation
 from fiberRecorders import iter_elem_fibers, damage_states, read_sect_xml, fiber_strain
 
-plt.style.use('brace2.mplstyle')
+#plt.style.use('brace2.mplstyle')
 
 currentDataFolder = "data_hwd_col_4010"
 
@@ -16,7 +17,7 @@ def print_help():
     print("""
     fiberStrains.py -a -dsr dsr -sec sec ...
 
-    a is analysis type and can be any one of: [po cyclic]
+    a is analysis type and can be any one of: [po cyclic <section-deformation-file>]
     dsr can be any set of: [dsr1 dsr2 dsr3 dsr4 dsr5 dsr6 all]
     sec can be any one of: [1 np], where np is integer representing last integration point.
     
@@ -41,10 +42,10 @@ def parse_args(args) -> dict:
             print_help()
             sys.exit()
 
-        if arg == "-a":
+        elif arg == "-a":
             opts["a"] = next(argi)
 
-        if arg == "-dsr":
+        elif arg == "-dsr":
             opts["dsr"] =  [
                 ds for ds in next(argi).split(",")
             ]
@@ -62,22 +63,19 @@ def parse_args(args) -> dict:
 
     return opts
 
-def getSectionStrains(a, dsr, sec, model, elems):
+def getDamageStateStrains(a, dsr, sec, model, elems, opts):
     regions = damage_states(84.0)
     recorder_data = read_sect_xml(a)
     intFrames = 1
-    X = []
-    Y = []
-    X,Y,epsRaw = tuple(zip(*(
+    X,Y,epsRaw = zip(*(
             (
-                fib["coord"][0], 
-                fib["coord"][1],
-                fiber_strain(recorder_data, elem["name"], s, fib)
+                fib["coord"][0], fib["coord"][1],
+                fiber_strain(recorder_data, e["name"], s, fib)
             ) for ds in dsr
-        for elem, s, fib in iter_elem_fibers(model, elems, [int(sec)-1], filt=regions[ds])
-    )))
+        for e,s,fib in iter_elem_fibers(model, elems, [int(sec)-1], filt=regions[ds])
+    ))
     eps = np.array([e.T for e in epsRaw])
-    return X, Y, eps, intFrames, np.arange(eps.size[1])
+    return X, Y, eps, intFrames, np.arange(eps.shape[1])
 
 def getStrains(a, dsr, sec):
     dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
@@ -100,6 +98,7 @@ def getStrains(a, dsr, sec):
                 X.append(float(x))
                 Y.append(float(y))
                 epsRaw.append(np.loadtxt(dataDir+"\\"+file)[:, 2])
+
     if len(X) == 0:
         print("no fibers to plot! check DS definition and/or dsr option")
         return None, None, None, None, None
@@ -120,7 +119,10 @@ def yieldpt(X, Y, eps, times):
             YyieldedFibers = np.array(Y)[iYieldedFibers]
             coordsYieldedFibers = np.column_stack((XyieldedFibers, YyieldedFibers))
             epsYieldedFibers = epst[iYieldedFibers]
-            yieldSummary = pd.DataFrame(np.column_stack( (coordsYieldedFibers, epsYieldedFibers, [t]*len(coordsYieldedFibers)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"])
+            yieldSummary = pd.DataFrame(np.column_stack(
+                (coordsYieldedFibers, epsYieldedFibers, [t]*len(coordsYieldedFibers)) ), 
+                columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"]
+            )
             yieldSummary.to_csv("YieldSummary.csv", index=False)
             print("the coordinates and corresponding strains of yielded fibers are:")
             print(yieldSummary)
@@ -156,7 +158,15 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             YUltFibers6 = np.array(Y6)[iUltFibers6]
             coordsUltFibers6 = np.column_stack((XUltFibers6, YUltFibers6))
             epsUltFibers6 = epst6[iUltFibers6]
-            ultSummary5 = pd.DataFrame(np.column_stack( (coordsUltFibers5, epsUltFibers5, [t]*len(coordsUltFibers5), ["concrete"]*len(coordsUltFibers5)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
+            ultSummary5 = pd.DataFrame(
+                np.column_stack((
+                    coordsUltFibers5, 
+                    epsUltFibers5, 
+                    [t]*len(coordsUltFibers5), 
+                    ["concrete"]*len(coordsUltFibers5))
+                ),
+                columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"]
+            )
             ultSummary6 = pd.DataFrame(np.column_stack( (coordsUltFibers6, epsUltFibers6, [t]*len(coordsUltFibers6), ["steel"]*len(coordsUltFibers6)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
             ultSummary = ultSummary5.append(ultSummary6)
             ultSummary.to_csv("UltimateSummary.csv", index=False)
@@ -343,12 +353,16 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
 
 if __name__ == "__main__":
 
-    with open("modelDetails.json", "r") as f:
+    "getStrains [options] <model> <recorder-output>"
+
+
+    with open("/home/claudio/brace/Caltrans/Caltrans.Hayward/Procedures/datahwd12.1/modelDetails.json", "r") as f:
         model = json.load(f)
 
     opts = parse_args(sys.argv[1:])
+
     if opts["section_deformations"]:
-        X, Y, eps, intFrames, times = getSectionStrains(opts["a"], opts["dsr"], opts["sec"], model, ["4010"])
+        X, Y, eps, intFrames, times = getDamageStateStrains(opts["a"], opts["dsr"], opts["sec"], model, [4020])
     else:
         X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
 
@@ -379,3 +393,4 @@ if __name__ == "__main__":
 
     if opts["a"] == 'cyclic':
         getCyclic(opts["a"])
+
