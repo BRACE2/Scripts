@@ -184,6 +184,18 @@ def read_sect_xml(xml_file):
     getDictData(data, dataDict)
     return dataDict
 
+def fiber_strain(recorder_data, el, s, f, t=None):
+    if t is not None:
+        eps = recorder_data[str(el)][str(s)]["eps"][t]
+        kz =  recorder_data[str(el)][str(s)]["kappaZ"][t]
+        ky =  recorder_data[str(el)][str(s)]["kappaY"][t]
+    else:
+        eps = recorder_data[str(el)][str(s)]["eps"]
+        kz =  recorder_data[str(el)][str(s)]["kappaZ"]
+        ky =  recorder_data[str(el)][str(s)]["kappaY"]
+
+    return eps - kz * f["coord"][1] + ky * f["coord"][0]
+
 def print_help():
     print(HELP)
 
@@ -284,4 +296,3 @@ if __name__=="__main__":
     for e,s,f in iter_elem_fibers(model, elements, sections, damage_state):
         elem_cmd = base_cmd + f"-ele {e['name']} "
         print_fiber(f["coord"], s, elem_cmd + f"section {s} ", opts)
-

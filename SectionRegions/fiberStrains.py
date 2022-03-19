@@ -5,8 +5,9 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib import animation
+from fiberRecorders import iter_elem_fibers, damage_states, read_sect_xml, fiber_strain
 
-# plt.style.use('brace2.mplstyle')
+plt.style.use('brace2.mplstyle')
 
 currentDataFolder = "data_hwd_col_4010"
 
@@ -56,6 +57,43 @@ def parse_args(args) -> dict:
             opts["vmaxset"] = next(argi)
 
     return opts
+
+def getStrains(a, dsr, sec):
+    dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
+    times = np.loadtxt(dataDir+"\\"+os.listdir(dataDir)[0])[:, 0]
+    if a == "po":
+        intFrames = 1
+    if a == "cyclic":
+        intFrames = 1
+    X = []
+    Y = []
+    files = []
+    epsRaw = []
+    for ds in dsr:
+        startSeq = ds + "_" + sec + "_"
+        for file in os.listdir(dataDir):
+            if file.startswith(startSeq):
+                files.append(file)
+                x = re.search(startSeq+'(.+?)_', file).group(1)
+                y = re.search('([e\d.-]+?).txt', file).group(1)
+                X.append(float(x))
+                Y.append(float(y))
+                epsRaw.append(np.loadtxt(dataDir+"\\"+file)[:, 2])
+    if len(X) == 0:
+        print("no fibers to plot! check DS definition and/or dsr option")
+        return None, None, None, None, None
+    else:
+        eps = np.zeros([len(X), len(epsRaw[0])])
+        for i in range(len(X)):
+            eps[i, :] = epsRaw[i].T
+        return X, Y, eps, intFrames, times
+
+
+def updateStrains(xmlName):
+    recorder_data = read_sect_xml(xmlName)
+
+    for e, s, f in iter_elem_fibers(model, [4020]):
+        f.update({"strain": fiber_strain(recorder_data, "4020", "4", f)})
 
 def getStrains(a, dsr, sec):
     dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
