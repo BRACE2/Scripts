@@ -157,7 +157,7 @@ def ComposeModes(dt, A, B, C, D):
     for i in range(2, n-2):
         if (freq1[i] == freq1[i+1]) or (freq1[i] == freq1[i-1]):
             roots.append(i)
- 
+
     # b) Determination of damping ratios (Eqs. 3.46 & 3.39)
     damp1 = -np.real(sj1)/(2*pi*freq1)
     # Represent the identified frequency & damping information
@@ -194,6 +194,16 @@ def parse_okid(args, config):
     n determines size of the state-space model used for representing the system.
     """
     return config
+
+#
+# TFE
+#
+def stfe(dati, dato, **config):
+    pass
+
+def ftfe(dati, dato, **config):
+    "Fourier transfer function estimate"
+    pass
 
 #
 # SRIM
@@ -276,9 +286,14 @@ def srim(
     same orm in OKID-ERA-DC is used. It can be changed if needed.
 
     """
+    #
+    # Convenience argument handling
+    #
     dt = to = config.get("dt", None) or dati["time_step"]
     p = config.get("p")         # # steps used for the identification (ie, prediction horizon)
     n = n1 = config.get("n", config.get("orm"))  # Order of the model.
+
+    assert p > n/m + 1
 
     if issubclass(dati.__class__, dict):
         dati = dati.data
@@ -514,6 +529,13 @@ def srim(
 ##    RMSEpredSRIM = sum(Jm)/m
 ###%KKKKK
 ##    return freqdmpSRIM,modeshapeSRIM,RMSEpredSRIM
+
+def parse_args(argv):
+    argi = iter(argv[1:])
+    assert argv[1] in ["srim", "stfe", "ftfe", "okid"]
+    for arg in argi:
+        if arg == "":
+            pass
 
 if __name__ == "__main__":
     import sys
