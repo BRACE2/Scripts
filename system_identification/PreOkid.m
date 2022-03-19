@@ -26,14 +26,14 @@ datnn = dat;
 % c) Decimating the data
 datn = datnn(1:div:d,:);    % decimating data by selecting every div-th point.
 % Currebtly, div = 1, so all data is used.
-dt_new = dt*div;                % sampling time increases due to decimating the data.
+dt_new = dt*div;            % sampling time increases due to decimating the data.
 dn = d/div;                 % total number of time steps after decimating =
-% total number of acceleration samples per channel
+                            % total number of acceleration samples per channel
 
 dati = datn(:,inpchns);     % accelerations at input channels after pre-processing,
-% dati is a matrix with size dn x inpchns.
-% # of rows is dn & # of columns is inpchns.
+                            % dati is a matrix with size dn x inpchns.
+                            % # of rows is dn & # of columns is inpchns.
 dato = datn(:,outchns);     % accelerations at output channels after pre-processing,
-% dato is a matrix with size dn x outchns.
-% # of rows is dn & # of columns is outchns.
+                            % dato is a matrix with size dn x outchns.
+                            % # of rows is dn & # of columns is outchns.
 
