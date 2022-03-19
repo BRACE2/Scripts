@@ -225,7 +225,7 @@ v_inv = v^-1;
 qlin = v_inv*Qb;     % Controllability Matrix used for the input-EMAC
 plin = Pb*v;     % Observability Matrix used for the output-EMAC
 
-lamb = v_inv*A*v
+lamb = v_inv*A*v;
 bkh = v_inv*B;
 for hn = 1:n
     for ll = 0:l-1
