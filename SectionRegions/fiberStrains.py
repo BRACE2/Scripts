@@ -3,6 +3,7 @@
 import os, re, sys
 import numpy as np
 import pandas as pd
+import json
 from matplotlib import pyplot as plt
 from matplotlib import animation
 from fiberRecorders import iter_elem_fibers, damage_states, read_sect_xml, fiber_strain
@@ -61,7 +62,8 @@ def parse_args(args) -> dict:
 
     return opts
 
-def getSectionStrains(a, dsr, sec):
+def getSectionStrains(a, dsr, sec, model, elems):
+    regions = damage_states(84.0)
     recorder_data = read_sect_xml(a)
     intFrames = 1
     X = []
@@ -70,9 +72,9 @@ def getSectionStrains(a, dsr, sec):
             (
                 fib["coord"][0], 
                 fib["coord"][1],
-                 fiber_strain(recorder_data, elem["name"], sec, fib)
-            ) for ds in ["dsr1", "dsr2"] 
-        for elem, sec, fib in iter_elem_fibers(model, elems, [3], filt=regions[ds])
+                fiber_strain(recorder_data, elem["name"], s, fib)
+            ) for ds in dsr
+        for elem, s, fib in iter_elem_fibers(model, elems, [int(sec)-1], filt=regions[ds])
     )))
     eps = np.array([e.T for e in epsRaw])
     return X, Y, eps, intFrames, np.arange(eps.size[1])
@@ -341,9 +343,12 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
 
 if __name__ == "__main__":
 
+    with open("modelDetails.json", "r") as f:
+        model = json.load(f)
+
     opts = parse_args(sys.argv[1:])
     if opts["section_deformations"]:
-        X, Y, eps, intFrames, times = getSectionStrains(opts["a"], opts["dsr"], opts["sec"])
+        X, Y, eps, intFrames, times = getSectionStrains(opts["a"], opts["dsr"], opts["sec"], model, ["4010"])
     else:
         X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
 

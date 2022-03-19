@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <OpenSees
+  xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation = "http://OpenSees.berkeley.edu/xml-schema/xmlns/OpenSees.xsd">
+    <ElementOutput eleType="ForceBeamColumn3d" eleTag="3020" node1="307" node2="306">
+        <GaussPointOutput number="1" eta="-1">
+            <SectionOutput secType="SectionAggregator" secTag="3020">
+                <ResponseType>eps</ResponseType>
+                <ResponseType>kappaZ</ResponseType>
+                <ResponseType>kappaY</ResponseType>
+                <ResponseType>theta</ResponseType>
+                <ResponseType>gammaY</ResponseType>
+                <ResponseType>gammaZ</ResponseType>
+            </SectionOutput>
+        </GaussPointOutput>
+    </ElementOutput>
+    <ElementOutput eleType="ForceBeamColumn3d" eleTag="4010" node1="401" node2="402">
+        <GaussPointOutput number="1" eta="-1">
+            <SectionOutput secType="SectionAggregator" secTag="4010">
+                <ResponseType>eps</ResponseType>
+                <ResponseType>kappaZ</ResponseType>
+                <ResponseType>kappaY</ResponseType>
+                <ResponseType>theta</ResponseType>
+                <ResponseType>gammaY</ResponseType>
+                <ResponseType>gammaZ</ResponseType>
+            </SectionOutput>
+        </GaussPointOutput>
+    </ElementOutput>
+    <ElementOutput eleType="ForceBeamColumn3d" eleTag="4020" node1="407" node2="406">
+        <GaussPointOutput number="1" eta="-1">
+            <SectionOutput secType="SectionAggregator" secTag="4020">
+                <ResponseType>eps</ResponseType>
+                <ResponseType>kappaZ</ResponseType>
+                <ResponseType>kappaY</ResponseType>
+                <ResponseType>theta</ResponseType>
+                <ResponseType>gammaY</ResponseType>
+                <ResponseType>gammaZ</ResponseType>
+            </SectionOutput>
+        </GaussPointOutput>
+    </ElementOutput>
+    <Data>
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        -1.83119e-05 1.78217e-07 -4.61342e-07 -2.1274e-08 -2.50652e-07 6.49028e-07 -4.11823e-05 4.38852e-07 3.55262e-07 -2.22527e-07 -1.32557e-06 -5.25744e-07 -0.000172841 3.83219e-07 -1.20047e-06 -4.87272e-08 -5.12247e-07 1.60466e-06 
+        </Data>
+</OpenSees>
