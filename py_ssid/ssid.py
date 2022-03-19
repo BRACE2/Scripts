@@ -57,6 +57,23 @@ EXAMPLES="""
     ssid okid -wm -i ch02.v2 ch03.v2 -o ch04.v2 ch05.v2
 """
 
+class IdentifiedSystem:
+    def __init__(self, time_step, *system, **kwds):
+        self.system = system
+        self.freqdmp, modeshapeSRIM, *_ = ComposeModes(time_step, *system)
+
+    def __repr__(self):
+        import textwrap
+        try:
+            nln = "\n                "
+            return textwrap.dedent(f"""
+            Spectral quantities:
+                   T      \N{Mathematical Italic Small F}       \N{Greek Small Letter Zeta}
+                {nln.join(f"{1/i: <6.4}  {i: <6.4}  {j: <6.4}" for i,j in np.real(self.freqdmp[:,:2]))}
+            """)
+        except Exception as e:
+            return f"Error extracting modes: {e}"
+
 def parse_args(args):
     outputs = []
     parsers = {
@@ -277,20 +294,30 @@ def srim(
 
     """
     dt = to = config.get("dt", None) or dati["time_step"]
-    p = config.get("p")         # # steps used for the identification (ie, prediction horizon)
-    n = n1 = config.get("n", config.get("orm"))  # Order of the model.
+    p = config.get("p", config.get("mro"))         # # steps used for the identification (ie, prediction horizon)
+    n = n1 = config.get("n", config.get("orm", 4))  # Order of the model.
 
-    if issubclass(dati.__class__, dict):
+    if isinstance(dati, list):
+        dati = np.array([i.data for i in dati]).T
+    elif issubclass(dati.__class__, dict):
         dati = dati.data
-    if issubclass(dato.__class__, dict):
+
+    if isinstance(dato, list):
+        dato = np.array([i.data for i in dato]).T
+    elif issubclass(dato.__class__, dict):
         dato = dato.data
+
     if len(dati.shape) < 2:
         dati = np.atleast_2d(dati).T
     if len(dato.shape) < 2:
         dato = np.atleast_2d(dato).T
 
+    if verbose:
+        progress_bar = tqdm
+    else:
+        progress_bar = lambda arg, **kwds: (i for i in arg)
 
-    dn = config.get("dn", None) or len(dati)
+    dn = config.get("dn", None) or dati.shape[0]
 
     # 2a. Compute y (output) and u (input) vectors (Eqs. 3.58 & 3.60)
 
@@ -351,7 +378,7 @@ def srim(
     # Output Error Minimization
 
     # Setting up the Phi matrix
-    Phi  = np.zeros((m*nsizS, n1+m*r+n1*r))
+    Phi  = np.zeros((m*nsizS, n+m*r+n*r))
     CA_powers = np.zeros((nsizS, m, A.shape[1]))
     CA_powers[0, :, :] = C
     A_p = A
@@ -361,22 +388,22 @@ def srim(
 
     # First block column of Phi
     for df in range(nsizS):
-        Phi[df*m:(df+1)*m,:n1] = CA_powers[df,:,:]
+        Phi[df*m:(df+1)*m,:n] = CA_powers[df,:,:]
 
     # Second block column of Phi
     Imm = np.eye(m)
     for i in range(nsizS):
-        Phi[i*m:(i+1)*m,n1:n1+m*r] = np.kron(dati[i,:],Imm)
+        Phi[i*m:(i+1)*m, n:n+m*r] = np.kron(dati[i,:],Imm)
 
     # Third block column of Phi
-    In1n1 = np.eye(n1)
-    cc = n1+m*r + 1
-    dd = n1+m*r+n1*r
+    In1n1 = np.eye(n)
+    cc = n + m*r + 1
+    dd = n + m*r + n*r
 
     krn = np.array([np.kron(dati[i,:],In1n1) for i in range(nsizS)])
 
     with multiprocessing.Pool(pool_size) as pool:
-        for i,res in tqdm(
+        for i,res in progress_bar(
                 pool.imap_unordered(
                     partial(_blk_3,CA=CA_powers,U=np.flip(krn,0)),
                     range(1,nsizS),
