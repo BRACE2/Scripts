@@ -31,6 +31,7 @@ def parse_args(args) -> dict:
         "dsr": None,
         "sec": None,
         "vminset": None,
+        "section_deformations": False,
         "vmaxset": None
     }
     argi = iter(args)
@@ -46,6 +47,8 @@ def parse_args(args) -> dict:
             opts["dsr"] =  [
                 ds for ds in next(argi).split(",")
             ]
+        elif arg == "-sd":
+            opts["section_deformations"] = True
 
         elif arg == "-sec":
             opts["sec"] = next(argi)
@@ -58,42 +61,21 @@ def parse_args(args) -> dict:
 
     return opts
 
-def getStrains(a, dsr, sec):
-    dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
-    times = np.loadtxt(dataDir+"\\"+os.listdir(dataDir)[0])[:, 0]
-    if a == "po":
-        intFrames = 1
-    if a == "cyclic":
-        intFrames = 1
+def getSectionStrains(a, dsr, sec):
+    recorder_data = read_sect_xml(a)
+    intFrames = 1
     X = []
     Y = []
-    files = []
-    epsRaw = []
-    for ds in dsr:
-        startSeq = ds + "_" + sec + "_"
-        for file in os.listdir(dataDir):
-            if file.startswith(startSeq):
-                files.append(file)
-                x = re.search(startSeq+'(.+?)_', file).group(1)
-                y = re.search('([e\d.-]+?).txt', file).group(1)
-                X.append(float(x))
-                Y.append(float(y))
-                epsRaw.append(np.loadtxt(dataDir+"\\"+file)[:, 2])
-    if len(X) == 0:
-        print("no fibers to plot! check DS definition and/or dsr option")
-        return None, None, None, None, None
-    else:
-        eps = np.zeros([len(X), len(epsRaw[0])])
-        for i in range(len(X)):
-            eps[i, :] = epsRaw[i].T
-        return X, Y, eps, intFrames, times
-
-
-def updateStrains(xmlName):
-    recorder_data = read_sect_xml(xmlName)
-
-    for e, s, f in iter_elem_fibers(model, [4020]):
-        f.update({"strain": fiber_strain(recorder_data, "4020", "4", f)})
+    X,Y,epsRaw = tuple(zip(*(
+            (
+                fib["coord"][0], 
+                fib["coord"][1],
+                 fiber_strain(recorder_data, elem["name"], sec, fib)
+            ) for ds in ["dsr1", "dsr2"] 
+        for elem, sec, fib in iter_elem_fibers(model, elems, [3], filt=regions[ds])
+    )))
+    eps = np.array([e.T for e in epsRaw])
+    return X, Y, eps, intFrames, np.arange(eps.size[1])
 
 def getStrains(a, dsr, sec):
     dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
@@ -360,8 +342,10 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
 if __name__ == "__main__":
 
     opts = parse_args(sys.argv[1:])
-
-    X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
+    if opts["section_deformations"]:
+        X, Y, eps, intFrames, times = getSectionStrains(opts["a"], opts["dsr"], opts["sec"])
+    else:
+        X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
 
     if opts["a"] == 'po':
         if opts["vminset"] is None:
