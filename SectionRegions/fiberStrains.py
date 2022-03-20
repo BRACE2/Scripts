@@ -11,8 +11,6 @@ from fiberRecorders import iter_elem_fibers, damage_states, read_sect_xml, fiber
 
 #plt.style.use('brace2.mplstyle')
 
-currentDataFolder = "data_hwd_col_4010"
-
 def print_help():
     print("""
     fiberStrains.py -a -dsr dsr -sec sec ...
@@ -63,7 +61,7 @@ def parse_args(args) -> dict:
 
     return opts
 
-def getDamageStateStrains(a, dsr, sec, model, elems, opts):
+def getDamageStateStrains(a, dsr, sec, model, elems):
     regions = damage_states(84.0)
     recorder_data = read_sect_xml(a)
     intFrames = 1
@@ -77,9 +75,9 @@ def getDamageStateStrains(a, dsr, sec, model, elems, opts):
     eps = np.array([e.T for e in epsRaw])
     return X, Y, eps, intFrames, np.arange(eps.shape[1])
 
+
 def getStrains(a, dsr, sec):
-    dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
-    times = np.loadtxt(dataDir+"\\"+os.listdir(dataDir)[0])[:, 0]
+    dataDir = os.getcwd()
     if a == "po":
         intFrames = 1
     if a == "cyclic":
@@ -106,6 +104,7 @@ def getStrains(a, dsr, sec):
         eps = np.zeros([len(X), len(epsRaw[0])])
         for i in range(len(X)):
             eps[i, :] = epsRaw[i].T
+        times = np.arange(eps.shape[1])
         return X, Y, eps, intFrames, times
 
 def yieldpt(X, Y, eps, times):
@@ -187,7 +186,7 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             plt.show()
             return timeUlt, list(coordsUltFibers5).append(list(coordsUltFibers6)), list(epsUltFibers5).append(list(epsUltFibers6))
 
-def get_DS(a, sec):
+def get_DS(a, sec, model, elems):
     dsrs = ["dsr6", "dsr5", "dsr4", "dsr3", "dsr2", "dsr1"]
     thresholds = [0.09, -0.011, -0.005, -0.005, -0.005, 1.32e-4]
     # Get timepoints at which each strain-based damage state occurs
@@ -195,7 +194,7 @@ def get_DS(a, sec):
     for i in range(len(dsrs)):
         dsr = dsrs[i]
         th = thresholds[i]
-        X, Y, eps = getStrains(a, [dsr], sec)[:3]
+        X, Y, eps = getDamageStateStrains(a, [dsr], sec, model, elems)[:3]
         for t in range(eps.shape[1]):
             epst = eps[:, t]
             if (th < 0 and any(epst <= th)) or (th > 0 and any(epst >= th)):
@@ -208,7 +207,7 @@ def get_DS(a, sec):
                 epsDSFibers = epst[iDSFibers]
                 DSsummary = pd.DataFrame(np.column_stack((coordsDSFibers, epsDSFibers, [t] * len(coordsDSFibers))),
                                            columns=["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"])
-                DSsummary.to_csv("DS"+str(6-i)+"Summary.csv", index=False)
+                DSsummary.to_csv("DSsummaries/DS"+str(6-i)+"Summary.csv", index=False)
                 # print("the coordinates and corresponding strains of failed fibers at DS", 6-i, " are:")
                 # print(DSsummary)
                 plt.figure(figsize=(6, 5))
@@ -222,18 +221,20 @@ def get_DS(a, sec):
                 plt.xlim([-50, 50])
                 plt.ylim([-50, 50])
                 plt.legend()
-                plt.gcf().savefig("DS"+str(6-i)+".png")
+                plt.gcf().savefig("DSsummaries/DS"+str(6-i)+".png")
                 plt.show()
                 break
 
     for i in range(len(dsrs)):
         dsr = dsrs[i]
         th = thresholds[i]
-        X, Y, eps = getStrains(a, [dsr], sec)[:3]
+        X, Y, eps = getDamageStateStrains(a, [dsr], sec, model, elems)[:3]
         # Get overall strain-based damage state (over all time points)
         if (th < 0 and np.any(eps <= th)) or (th > 0 and np.any(eps >= th)):
             print("The strain-based damage state is DS", 6-i)
             return dsr, timeDS
+    print("The strain-based damage state is DS0")
+    return "dsr0", 0
 
 
 def getPushover(a, timeYield, timeUlt, timeDS):
@@ -349,20 +350,22 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
         plt.title("Animation of Strain Distribution Over Time")
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, interval=intFrames, frames=eps.shape[1], repeat=True)
-    plt.show()
+    # plt.show()
+    writergif = animation.PillowWriter(fps=30)
+    anim.save("fiberStrainAnimation.gif", writer=writergif)
 
 if __name__ == "__main__":
 
     "getStrains [options] <model> <recorder-output>"
 
 
-    with open("/home/claudio/brace/Caltrans/Caltrans.Hayward/Procedures/datahwd12.1/modelDetails.json", "r") as f:
+    with open("modelDetails.json", "r") as f:
         model = json.load(f)
 
     opts = parse_args(sys.argv[1:])
 
     if opts["section_deformations"]:
-        X, Y, eps, intFrames, times = getDamageStateStrains(opts["a"], opts["dsr"], opts["sec"], model, [4020])
+        X, Y, eps, intFrames, times = getDamageStateStrains(opts["a"], opts["dsr"], opts["sec"], model, [4010])
     else:
         X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
 
@@ -373,14 +376,14 @@ if __name__ == "__main__":
             vmaxset = 0.04
     else:
         if opts["vminset"] is None:
-            vminset = -0.001
+            vminset = -0.01
         if opts["vmaxset"] is None:
-            vmaxset = 0.001
+            vmaxset = 0.01
     animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset)
 
     if np.all(np.isin(["dsr1", "dsr2", "dsr3", "dsr4", "dsr5", "dsr6"], opts["dsr"])):
         print("Calculating Strain-Based Damage State...")
-        dsr, timeDS = get_DS(opts["a"], opts["sec"])
+        dsr, timeDS = get_DS(opts["a"], opts["sec"], model, [4010])
 
     if np.isin("dsr6", opts["dsr"]) and np.isin("dsr5", opts["dsr"]) and opts["a"] == 'po':
         X6, Y6, eps6, intFrames6, times6 = getStrains(opts["a"], ["dsr6"], opts["sec"])
