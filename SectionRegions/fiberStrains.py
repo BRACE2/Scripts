@@ -9,20 +9,23 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 from fiberRecorders import iter_elem_fibers, damage_states, read_sect_xml, fiber_strain
 
-#plt.style.use('brace2.mplstyle')
+# plt.style.use('brace2.mplstyle')
 
 def print_help():
     print("""
-    fiberStrains.py -a -dsr dsr -sec sec ...
+    fiberStrains.py -a dataDir -dsr dsr -ele elems -sec sec ...
 
-    a is analysis type and can be any one of: [po cyclic <section-deformation-file>]
-    dsr can be any set of: [dsr1 dsr2 dsr3 dsr4 dsr5 dsr6 all]
+    a is path to directory with either section deformation (xml format) or fiber strain (file format) recorder output file.  e.g., datahwd10.1/GM1, or datahwd_col_4010_po, etc.
+    dsr can be any set of: [dsr1 dsr2 dsr3 dsr4 dsr5 dsr6 all], or "6ds".  6ds is equivalent to dsr1,2,...,6.
+    ele are the set of elements studied, e.g. 3020,4010,4020, or "all" if all (non-interlocking) columns. If not specified, default is 4010.
     sec can be any one of: [1 np], where np is integer representing last integration point.
     
     Options
+    -sd
     -vmin <float>
     -vmax <float>
     
+    sd indicates whether using section deformations. default is using fiber strains.
     vmin and vmax are customized colorbar limits, if defaults must be adjusted.
 """)
 
@@ -30,10 +33,12 @@ def parse_args(args) -> dict:
     opts = {
         "dsr": None,
         "sec": None,
-        "vminset": None,
+        "ele": None,
         "section_deformations": False,
+        "vminset": None,
         "vmaxset": None
     }
+
     argi = iter(args)
     for arg in argi:
         if arg[:2] == "-h":
@@ -47,6 +52,12 @@ def parse_args(args) -> dict:
             opts["dsr"] =  [
                 ds for ds in next(argi).split(",")
             ]
+
+        elif arg == "-ele":
+            opts["elems"] =  [
+                int(ele) for ele in next(argi).split(",")
+            ]
+
         elif arg == "-sd":
             opts["section_deformations"] = True
 
@@ -62,30 +73,39 @@ def parse_args(args) -> dict:
     return opts
 
 def getDamageStateStrains(a, dsr, sec, model, elems):
-    regions = damage_states(84.0)
-    recorder_data = read_sect_xml(a)
+    recorder_data = read_sect_xml(a+"/eleDef"+sec+".txt")
     intFrames = 1
-    X,Y,epsRaw = zip(*(
-            (
-                fib["coord"][0], fib["coord"][1],
-                fiber_strain(recorder_data, e["name"], s, fib)
-            ) for ds in dsr
-        for e,s,fib in iter_elem_fibers(model, elems, [int(sec)-1], filt=regions[ds])
-    ))
-    eps = np.array([e.T for e in epsRaw])
-    return X, Y, eps, intFrames, np.arange(eps.shape[1])
 
+    epsEle = []
+    for ele in elems:
+        if ele < 12000:
+            # print("ele < 12000; ele = ", ele)
+            regions = damage_states(84.0)
+        elif ele < 13000:
+            # print("12000 < ele < 13000; ele = ", ele)
+            regions = damage_states(66.0)
+        else:
+            # print("ele > 13000; ele = ", ele)
+            regions = damage_states(48.0)
+        X,Y,epsRaw = zip(*(
+                (
+                    fib["coord"][0], fib["coord"][1],
+                    fiber_strain(recorder_data, e["name"], s, fib)
+                ) for ds in dsr
+            for e,s,fib in iter_elem_fibers(model, [ele], [int(sec)-1], filt=regions[ds])
+        ))
+        eps = np.array([e.T for e in epsRaw])
+        epsElei = X, Y, eps, intFrames, np.arange(eps.shape[1])
+        epsEle.append(epsElei)
+    return epsEle
 
 def getStrains(a, dsr, sec):
-    dataDir = os.getcwd()
-    if a == "po":
+    dataDir = os.getcwd() + "/" + a + "/"
+    if "po" in a:
         intFrames = 1
-    if a == "cyclic":
+    if "cyclic" in a:
         intFrames = 1
-    X = []
-    Y = []
-    files = []
-    epsRaw = []
+    X = []; Y = []; files = []; epsRaw = []
     for ds in dsr:
         startSeq = ds + "_" + sec + "_"
         for file in os.listdir(dataDir):
@@ -96,10 +116,9 @@ def getStrains(a, dsr, sec):
                 X.append(float(x))
                 Y.append(float(y))
                 epsRaw.append(np.loadtxt(dataDir+"\\"+file)[:, 2])
-
     if len(X) == 0:
         print("no fibers to plot! check DS definition and/or dsr option")
-        return None, None, None, None, None
+        sys.exit()
     else:
         eps = np.zeros([len(X), len(epsRaw[0])])
         for i in range(len(X)):
@@ -122,7 +141,7 @@ def yieldpt(X, Y, eps, times):
                 (coordsYieldedFibers, epsYieldedFibers, [t]*len(coordsYieldedFibers)) ), 
                 columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"]
             )
-            yieldSummary.to_csv("YieldSummary.csv", index=False)
+            yieldSummary.to_csv(a+"YieldSummary.csv", index=False)
             print("the coordinates and corresponding strains of yielded fibers are:")
             print(yieldSummary)
             plt.figure(figsize=(6, 5))
@@ -136,7 +155,7 @@ def yieldpt(X, Y, eps, times):
             plt.xlim([-50, 50])
             plt.ylim([-50, 50])
             plt.legend()
-            plt.gcf().savefig("YieldPoint.png")
+            plt.gcf().savefig(a+"YieldPoint.png")
             plt.show()
             return timeYield, coordsYieldedFibers, epsYieldedFibers
 
@@ -168,7 +187,7 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             )
             ultSummary6 = pd.DataFrame(np.column_stack( (coordsUltFibers6, epsUltFibers6, [t]*len(coordsUltFibers6), ["steel"]*len(coordsUltFibers6)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
             ultSummary = ultSummary5.append(ultSummary6)
-            ultSummary.to_csv("UltimateSummary.csv", index=False)
+            ultSummary.to_csv(a+"UltimateSummary.csv", index=False)
             print("the coordinates and corresponding strains of failed fibers are:")
             print(ultSummary)
             plt.figure(figsize=(6, 5))
@@ -182,68 +201,69 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             plt.xlim([-50, 50])
             plt.ylim([-50, 50])
             plt.legend()
-            plt.gcf().savefig("UltimatePoint.png")
+            plt.gcf().savefig(a+"UltimatePoint.png")
             plt.show()
             return timeUlt, list(coordsUltFibers5).append(list(coordsUltFibers6)), list(epsUltFibers5).append(list(epsUltFibers6))
 
 def get_DS(a, sec, model, elems):
     dsrs = ["dsr6", "dsr5", "dsr4", "dsr3", "dsr2", "dsr1"]
     thresholds = [0.09, -0.011, -0.005, -0.005, -0.005, 1.32e-4]
-    # Get timepoints at which each strain-based damage state occurs
-    timeDS = np.zeros([len(dsrs), 1])
-    for i in range(len(dsrs)):
+    if not os.path.exists(a+"/DSsummaries"):
+        os.makedirs(a+"/DSsummaries")
+    # Get timepoints at which each strain-based damage state occurs.
+    timeDS = np.zeros([len(dsrs)+1, len(elems)])
+    for i in range(len(dsrs)):  # For each DS / corresponding section region
         dsr = dsrs[i]
         th = thresholds[i]
-        X, Y, eps = getDamageStateStrains(a, [dsr], sec, model, elems)[:3]
-        for t in range(eps.shape[1]):
-            epst = eps[:, t]
-            if (th < 0 and any(epst <= th)) or (th > 0 and any(epst >= th)):
-                timeDS[i] = t
-                print("DS", 6-i, " occurs at timepoint ", t, ".")
-                iDSFibers = [i for i in range(len(X)) if (0 > th >= epst[i]) or (0 < th <= epst[i])]
-                XDSFibers = np.array(X)[iDSFibers]
-                YDSFibers = np.array(Y)[iDSFibers]
-                coordsDSFibers = np.column_stack((XDSFibers, YDSFibers))
-                epsDSFibers = epst[iDSFibers]
-                DSsummary = pd.DataFrame(np.column_stack((coordsDSFibers, epsDSFibers, [t] * len(coordsDSFibers))),
-                                           columns=["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"])
-                DSsummary.to_csv("DSsummaries/DS"+str(6-i)+"Summary.csv", index=False)
-                # print("the coordinates and corresponding strains of failed fibers at DS", 6-i, " are:")
-                # print(DSsummary)
-                plt.figure(figsize=(6, 5))
-                plt.scatter(X, Y, c=epst, vmin=-0.01, vmax=0.01)
-                plt.colorbar(label="strain")
-                plt.scatter(XDSFibers, YDSFibers, marker='x', color="r", label="Failed Fibers at DS"+str(6-i))
-                plt.xlabel("Section Horizontal (X) Axis [inches]")
-                plt.ylabel("Section Vertical (Y) Axis [inches]")
-                plt.title("Strains at point of DS"+str(6-i)+" (timepoint " + str(t) + ")")
-                plt.grid()
-                plt.xlim([-50, 50])
-                plt.ylim([-50, 50])
-                plt.legend()
-                plt.gcf().savefig("DSsummaries/DS"+str(6-i)+".png")
-                plt.show()
-                break
-
-    for i in range(len(dsrs)):
-        dsr = dsrs[i]
-        th = thresholds[i]
-        X, Y, eps = getDamageStateStrains(a, [dsr], sec, model, elems)[:3]
-        # Get overall strain-based damage state (over all time points)
-        if (th < 0 and np.any(eps <= th)) or (th > 0 and np.any(eps >= th)):
-            print("The strain-based damage state is DS", 6-i)
-            return dsr, timeDS
-    print("The strain-based damage state is DS0")
-    return "dsr0", 0
-
+        epsEle = getDamageStateStrains(a, [dsr], sec, model, elems)[:3]
+        for j in range(len(elems)):   # For each element
+            X, Y, eps = epsEle[j][:3]
+            for t in range(eps.shape[1]):
+                epst = eps[:, t]
+                if (th < 0 and any(epst <= th)) or (th > 0 and any(epst >= th)):
+                    timeDS[i, j] = t
+                    print("For element " + str(elems[j]) + ", DS", 6-i, " occurs at timepoint ", t, ".")
+                    iDSFibers = [i for i in range(len(X)) if (0 > th >= epst[i]) or (0 < th <= epst[i])]
+                    XDSFibers = np.array(X)[iDSFibers]
+                    YDSFibers = np.array(Y)[iDSFibers]
+                    coordsDSFibers = np.column_stack((XDSFibers, YDSFibers))
+                    epsDSFibers = epst[iDSFibers]
+                    DSsummary = pd.DataFrame(np.column_stack((coordsDSFibers, epsDSFibers, [t] * len(coordsDSFibers))),
+                                               columns=["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"])
+                    DSsummary.to_csv(a+"/DSsummaries/"+str(elems[j])+"DS"+str(6-i)+"Summary.csv", index=False)
+                    # print("For element " + str(elems[j]) + ", the coordinates and corresponding strains of failed fibers at DS", 6-i, " are:")
+                    # print(DSsummary)
+                    plt.figure(figsize=(6, 5))
+                    plt.scatter(X, Y, c=epst, vmin=-0.01, vmax=0.01)
+                    plt.colorbar(label="strain")
+                    plt.scatter(XDSFibers, YDSFibers, marker='x', color="r", label="Failed Fibers at DS"+str(6-i))
+                    plt.xlabel("Section Horizontal (X) Axis [inches]")
+                    plt.ylabel("Section Vertical (Y) Axis [inches]")
+                    plt.title("Element " + str(elems[j]) + ", strains at point of DS"+str(6-i)+" (timepoint " + str(t) + ")")
+                    plt.grid()
+                    plt.xlim([-50, 50])
+                    plt.ylim([-50, 50])
+                    plt.legend()
+                    plt.gcf().savefig(a+"/DSsummaries/"+str(elems[j])+"DS"+str(6-i)+".png")
+                    plt.show()
+                    break
+    print("timeDS", timeDS)
+    timeMaxDSele = np.amax(timeDS, axis=0)
+    maxDSele = np.array([6,5,4,3,2,1,0])[np.argmax(timeDS, axis=0)]
+    print("elems", elems)
+    print("timeMaxDSele", timeMaxDSele)
+    print("maxDSele", maxDSele)
+    DSbyEle = pd.DataFrame(np.column_stack((elems, maxDSele, timeMaxDSele)), columns=["Element", "DS", "Timepoint of DS"])
+    DSbyEle.to_csv(a+"/DamageStatesByElement.csv", index=False)
+    return maxDSele, timeMaxDSele
 
 def getPushover(a, timeYield, timeUlt, timeDS):
-    if a == "cyclic":
+    if "po" not in a:
         return None
     else:
-        dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
-        curv = -(np.loadtxt(dataDir+"\\eleDef1.txt"))[:,2]
-        mom = -(np.loadtxt(dataDir+"\\eleForce1.txt"))[:,2]
+        dataDir = os.getcwd() + "/" + a
+        curv = -(np.loadtxt(dataDir+"/eleDef1.txt"))[:,2]
+        mom = -(np.loadtxt(dataDir+"/eleForce1.txt"))[:,2]
 
         # Plot moment-curvature and yield and ultimate points
         plt.figure(figsize=(6, 5))
@@ -262,12 +282,12 @@ def getPushover(a, timeYield, timeUlt, timeDS):
         plt.legend()
         plt.grid()
         plt.tight_layout()
-        plt.gcf().savefig("Pushover.png")
+        plt.gcf().savefig(a+"Pushover.png")
         plt.show()
 
         # Plot force-displacement with PDCA and strain-based DS
-        disp = (np.loadtxt(dataDir+"\\nodeDisp.txt"))[:,0]
-        force = -(np.loadtxt(dataDir+"\\nodeReaction.txt"))[:,0]
+        disp = (np.loadtxt(dataDir+"/nodeDisp.txt"))[:,0]
+        force = -(np.loadtxt(dataDir+"/nodeReaction.txt"))[:,0]
         DI = [8.73, 14.37, 21.889999999999997, 29.41, 38.81, 46.33]
         dispDI = []
         forceDI = []
@@ -288,16 +308,16 @@ def getPushover(a, timeYield, timeUlt, timeDS):
         plt.legend()
         plt.grid()
         plt.tight_layout()
-        plt.gcf().savefig("PushoverFDwDS.png")
+        plt.gcf().savefig(a+"PushoverFDwDS.png")
         plt.show()
 
 def getCyclic(a):
-    if a == "po":
+    if "cyclic" not in a:
         return None
     else:
-        dataDir = os.getcwd()+"\\"+currentDataFolder+"_"+a
-        disp = (np.loadtxt(dataDir+"\\nodeDisp.txt"))[:,0]
-        force = -(np.loadtxt(dataDir+"\\nodeReaction.txt"))[:,0]
+        dataDir = os.getcwd() + "/" + a
+        disp = (np.loadtxt(dataDir+"/nodeDisp.txt"))[:,0]
+        force = -(np.loadtxt(dataDir+"/nodeReaction.txt"))[:,0]
 
         # Plot force-displacement
         plt.figure(figsize=(6, 5))
@@ -309,10 +329,10 @@ def getCyclic(a):
         plt.ylim([0, max(force)+50])
         plt.grid()
         plt.tight_layout()
-        plt.gcf().savefig("Cyclic.png")
+        plt.gcf().savefig(a+"Cyclic.png")
         plt.show()
 
-def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
+def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset, ele):
     if X is None:
         return None
     fig = plt.figure(figsize=(6, 5))
@@ -324,7 +344,7 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
     plt.ylim([-50,50])
     plt.xlabel("Section Horizontal Axis [inches]")
     plt.ylabel("Section Vertical Axis [inches]")
-    plt.title("Animation of Strain Distribution Over Time")
+    plt.title("Element "+str(ele)+", Animation of Strain Distribution Over Time")
 
     def init():
         plt.clf()
@@ -335,7 +355,7 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
         plt.ylim([-50,50])
         plt.xlabel("Section Horizontal Axis [inches]")
         plt.ylabel("Section Vertical Axis [inches]")
-        plt.title("Animation of Strain Distribution Over Time")
+        plt.title("Element "+str(ele)+", Animation of Strain Distribution Over Time")
 
     def animate(i):
         plt.clf()
@@ -347,45 +367,57 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset):
         plt.ylim([-50,50])
         plt.xlabel("Section Horizontal Axis [inches]")
         plt.ylabel("Section Vertical Axis [inches]")
-        plt.title("Animation of Strain Distribution Over Time")
+        plt.title("Element "+str(ele)+", Animation of Strain Distribution Over Time")
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, interval=intFrames, frames=eps.shape[1], repeat=True)
-    # plt.show()
-    writergif = animation.PillowWriter(fps=30)
-    anim.save("fiberStrainAnimation.gif", writer=writergif)
+    plt.show()
+    # writergif = animation.PillowWriter(fps=60)
+    # anim.save(str(ele)+"fiberStrainAnimation.gif", writer=writergif)
 
 if __name__ == "__main__":
 
-    "getStrains [options] <model> <recorder-output>"
-
-
-    with open("modelDetails.json", "r") as f:
-        model = json.load(f)
+    "fiberStrains [options] <model> <recorder-output>"
 
     opts = parse_args(sys.argv[1:])
 
-    if opts["section_deformations"]:
-        X, Y, eps, intFrames, times = getDamageStateStrains(opts["a"], opts["dsr"], opts["sec"], model, [4010])
-    else:
-        X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
+    with open(opts["a"]+"/modelDetails.json", "r") as f:
+        model = json.load(f)
 
-    if opts["a"] == 'po':
+    if opts["dsr"] == ["6ds"]:
+        opts["dsr"] = ["dsr1","dsr2","dsr3","dsr4","dsr5","dsr6"]
+
+    if opts["elems"] is None:
+        opts["elems"] = [4010]
+    if opts["elems"] == ["all"]:
+        opts["elems"] = [2010, 2020, 3010, 3020, 4010, 4020, 5010, 5020, 6010, 6020, 7010, 7020, 8010, 8020, 9010, 9020, 10010, 10020, 11010, 11020, 12010, 12020, 12030, 13010, 13020, 14010, 14020, 14030]
+
+    if "po" in opts["a"]:
         if opts["vminset"] is None:
             vminset = -0.02
         if opts["vmaxset"] is None:
             vmaxset = 0.04
     else:
         if opts["vminset"] is None:
-            vminset = -0.01
+            vminset = -0.00006
         if opts["vmaxset"] is None:
-            vmaxset = 0.01
-    animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset)
+            vmaxset = 0.0
+
+    if opts["section_deformations"]:
+        epsEle = getDamageStateStrains(opts["a"], opts["dsr"], opts["sec"], model, opts["elems"])
+        for i in range(len(epsEle)):
+            epsElei = epsEle[i]
+            ele = opts["elems"][i]
+            X, Y, eps, intFrames, times = epsElei
+            animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset, ele)
+    else:
+        X, Y, eps, intFrames, times = getStrains(opts["a"], opts["dsr"], opts["sec"])
+        animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset, 4010)
 
     if np.all(np.isin(["dsr1", "dsr2", "dsr3", "dsr4", "dsr5", "dsr6"], opts["dsr"])):
-        print("Calculating Strain-Based Damage State...")
-        dsr, timeDS = get_DS(opts["a"], opts["sec"], model, [4010])
+        print("Calculating Strain-Based Damage States...")
+        dsr, timeDS = get_DS(opts["a"], opts["sec"], model, opts["elems"])
 
-    if np.isin("dsr6", opts["dsr"]) and np.isin("dsr5", opts["dsr"]) and opts["a"] == 'po':
+    if np.isin("dsr6", opts["dsr"]) and np.isin("dsr5", opts["dsr"]) and 'po' in opts["a"]:
         X6, Y6, eps6, intFrames6, times6 = getStrains(opts["a"], ["dsr6"], opts["sec"])
         timeYield, coordsYieldedFibers, epsYieldedFibers = yieldpt(X6, Y6, eps6, times6)
 
@@ -394,6 +426,6 @@ if __name__ == "__main__":
 
         getPushover(opts["a"], timeYield, timeUlt, timeDS)
 
-    if opts["a"] == 'cyclic':
+    if "cyclic" in opts["a"]:
         getCyclic(opts["a"])
 
