@@ -251,7 +251,7 @@ def get_DS(a, sec, model, elems):
     timeMaxDSele = np.amax(timeDS, axis=0)
     maxDSele = np.array([6,5,4,3,2,1,0])[np.argmax(timeDS, axis=0)]
     for i in range(len(maxDSele)):
-        if maxDSele[i] == 6 and timeMaxDSele == 0:
+        if maxDSele[i] == 6 and timeMaxDSele[i] == 0:
             maxDSele[i] = 0
     print("elems", elems)
     print("timeMaxDSele", timeMaxDSele)
