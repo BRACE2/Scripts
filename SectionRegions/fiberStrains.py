@@ -20,7 +20,7 @@ def print_help():
     ele are the set of elements studied, e.g. 3020,4010,4020, or "all" if all (non-interlocking) columns. If not specified, default is 4010.
     sec can be any one of: [1 np], where np is integer representing last integration point.
     
-    Options
+    Options 
     -sd
     -vmin <float>
     -vmax <float>
@@ -156,7 +156,7 @@ def yieldpt(X, Y, eps, times):
             plt.ylim([-50, 50])
             plt.legend()
             plt.gcf().savefig(a+"YieldPoint.png")
-            plt.show()
+            # plt.show()
             return timeYield, coordsYieldedFibers, epsYieldedFibers
 
 def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
@@ -202,7 +202,7 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             plt.ylim([-50, 50])
             plt.legend()
             plt.gcf().savefig(a+"UltimatePoint.png")
-            plt.show()
+            # plt.show()
             return timeUlt, list(coordsUltFibers5).append(list(coordsUltFibers6)), list(epsUltFibers5).append(list(epsUltFibers6))
 
 def get_DS(a, sec, model, elems):
@@ -245,11 +245,14 @@ def get_DS(a, sec, model, elems):
                     plt.ylim([-50, 50])
                     plt.legend()
                     plt.gcf().savefig(a+"/DSsummaries/"+str(elems[j])+"DS"+str(6-i)+".png")
-                    plt.show()
+                    # plt.show()
                     break
     print("timeDS", timeDS)
     timeMaxDSele = np.amax(timeDS, axis=0)
     maxDSele = np.array([6,5,4,3,2,1,0])[np.argmax(timeDS, axis=0)]
+    for i in range(len(maxDSele)):
+        if maxDSele[i] == 6 and timeMaxDSele[i] == 0:
+            maxDSele[i] = 0
     print("elems", elems)
     print("timeMaxDSele", timeMaxDSele)
     print("maxDSele", maxDSele)
@@ -283,7 +286,7 @@ def getPushover(a, timeYield, timeUlt, timeDS):
         plt.grid()
         plt.tight_layout()
         plt.gcf().savefig(a+"Pushover.png")
-        plt.show()
+        # plt.show()
 
         # Plot force-displacement with PDCA and strain-based DS
         disp = (np.loadtxt(dataDir+"/nodeDisp.txt"))[:,0]
@@ -309,7 +312,7 @@ def getPushover(a, timeYield, timeUlt, timeDS):
         plt.grid()
         plt.tight_layout()
         plt.gcf().savefig(a+"PushoverFDwDS.png")
-        plt.show()
+        # plt.show()
 
 def getCyclic(a):
     if "cyclic" not in a:
@@ -330,7 +333,7 @@ def getCyclic(a):
         plt.grid()
         plt.tight_layout()
         plt.gcf().savefig(a+"Cyclic.png")
-        plt.show()
+        # plt.show()
 
 def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset, ele):
     if X is None:
@@ -369,8 +372,8 @@ def animate_heat_map(X, Y, eps, intFrames, vminset, vmaxset, ele):
         plt.ylabel("Section Vertical Axis [inches]")
         plt.title("Element "+str(ele)+", Animation of Strain Distribution Over Time")
 
-    anim = animation.FuncAnimation(fig, animate, init_func=init, interval=intFrames, frames=eps.shape[1], repeat=True)
-    plt.show()
+    # anim = animation.FuncAnimation(fig, animate, init_func=init, interval=intFrames, frames=eps.shape[1], repeat=True)
+    # plt.show()
     # writergif = animation.PillowWriter(fps=60)
     # anim.save(str(ele)+"fiberStrainAnimation.gif", writer=writergif)
 
