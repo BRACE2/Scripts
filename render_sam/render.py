@@ -151,7 +151,7 @@ Config = lambda : {
       },
 
       "nodes": {
-          "default": {"size": 2, "color": "#000000"},
+          "default": {"size": 1, "color": "#000000"},
           "displaced" : {},
           "fixed"  : {},
       },
@@ -166,25 +166,16 @@ Config = lambda : {
   }
 }
 
-def apply_config(conf, opts):
+def _apply_config(conf, opts):
     for k,v in conf.items():
         if isinstance(v,dict):
-            apply_conf(v, opts[k])
+            _apply_config(v, opts[k])
         else:
             opts[k] = v
 
 
 # The following Tcl script can be used to create a results
 # file
-
-EIG_SCRIPT = """
-for {set m 1} {$m <= 3} {incr m} {
-  puts "$m:"
-  foreach n [getNodeTags] {
-    puts "  $n: \[[join [nodeEigenvector $n $m] {, }]\]";
-  }
-}
-"""
 
 import sys, os
 try:
@@ -208,30 +199,41 @@ NDM=3 # this script currently assumes ndm=3
 
 class RenderError(Exception): pass
 
-def wireframe(sam:dict)->dict:
+def wireframe(sam:dict, shift: Array = None)->dict:
     """
     Process OpenSees JSON output and return dict with the form:
 
         {<elem tag>: {"crd": [<coordinates>], ...}}
     """
     geom  = sam["geometry"]
-    coord = np.array([n.pop("crd") for n in geom["nodes"]],dtype=FLOAT)
+    if shift is None:
+        shift = np.zeros(3)
+    else:
+        shift = np.asarray(shift)
+    coord = np.array([
+        n.pop("crd") for n in geom["nodes"]],
+    dtype=FLOAT) + shift
     nodes = {n["name"]: {**n, "crd": coord[i]} for i,n in enumerate(geom["nodes"])}
     trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
     elems =  {
       e["name"]: dict(
         **e, 
         crd=np.array([nodes[n]["crd"] for n in e["nodes"]], dtype=FLOAT),
-        trsfm=trsfm[e["crdTransformation"]] if "crdTransformation" in e else None
+        trsfm=trsfm[e["crdTransformation"]] 
+            if "crdTransformation" in e and e["crdTransformation"] in trsfm else None
       ) for e in geom["elements"]
     }
     return dict(nodes=nodes, elems=elems, coord=coord)
 
-def read_model(filename:str)->dict:
+def read_model(filename:str, shift=None)->dict:
     import json
-    with open(filename,"r") as f:
-        sam = json.load(f)
-    model = wireframe(sam["StructuralAnalysisModel"])
+    try:
+        with open(filename,"r") as f:
+            sam = json.load(f)
+    except TypeError:
+        sam = json.load(filename)
+
+    model = wireframe(sam["StructuralAnalysisModel"], shift=shift)
     if "RendererConfiguration" in sam:
         model["config"] = sam["RendererConfiguration"]
     return model
@@ -268,11 +270,11 @@ def elastic_curve(x: Array, v: Array, L:float)->Array:
     y = vi*N2+vj*N4
     return y.flatten()
 
-def linear_deformations(u,L):
+def linear_deformations(u: Array, L: float):
     """
     Compute local frame deformations assuming small displacements
 
-    u: 6-vector of displacements in rotated frame
+    u: 6-vector of displacements in rotated local frame
     L: element length
     """
     xi, yi, zi, si, ei, pi = range(6)    # Define variables to aid
@@ -292,7 +294,8 @@ def linear_deformations(u,L):
 
 
 def rotation(xyz: Array, vert=(0,0,-1))->Array:
-    "Create a rotation matrix between local e and global E"
+    """Create a rotation matrix between local e and global E
+    """
     dx = xyz[1] - xyz[0]
     L = np.linalg.norm(dx)
     e1 = dx/L
@@ -317,7 +320,7 @@ def displaced_profile(
     Q = rotation(coord, vect)
     L = np.linalg.norm(coord[1] - coord[0])
     v = linear_deformations(block_diag(*[Q]*rep)@displ, L)
-    Lnew = L+v[0,0]
+    Lnew = L + v[0,0]
     xaxis = np.linspace(0.0, Lnew, n)
 
     plan_curve = elastic_curve(xaxis, plan_dofs(v), Lnew)
@@ -362,13 +365,14 @@ def set_axis_limits(ax):
     aspect = [max(a,max(aspect)/8) for a in aspect]
     ax.set_box_aspect(aspect)
 
-def plot_skeletal(frame, axes=None, conf=None):
+def plot_skeletal(frame, ax = None, axes=None, conf=None):
     if axes is None: axes = [0,2,1]
     props = conf or {"color": "grey", "alpha": 0.6, "linewidth": 0.5}
-    ax = new_3d_axis()
+    ax = ax or new_3d_axis()
     for e in frame["elems"].values():
         x,y,z = e["crd"].T[axes]
         ax.plot(x,y,z, **props)
+
     return ax
 
 
@@ -380,7 +384,8 @@ def plot_nodes(frame, displ=None, axes=None, ax=None):
     props = {"color": "black",
              "marker": "s",
              "s": 2,
-             "zorder": 2}
+             "zorder": 2
+    }
 
     coord = frame["coord"]
     for i,n in enumerate(frame["nodes"].values()):
@@ -506,7 +511,7 @@ class MplPlotter(Plotter):
 
 class GnuPlotter(Plotter):
     def plot_frames(self):
-        file=sys.stdout
+        file = sys.stdout
         print("""
         set term wxt
         unset border
@@ -538,7 +543,7 @@ class PlotlyPlotter(Plotter):
     def plot_frames():
         pass
 
-    def _get_displ(self,res:dict):
+    def _get_displ(self,res:dict, name=None):
         frame = self.model
         axes = self.axes
         props = {"color": "red"}
@@ -557,6 +562,7 @@ class PlotlyPlotter(Plotter):
                 coords[(N+1)*i:(N+1)*i+N,:] = displaced_profile(el["crd"], glob_displ, vect=vect, npoints=N)[axes].T
         x,y,z = coords.T
         return {
+            "name": name if name is not None else "",
             "type": "scatter3d",
             "mode": "lines",
             "x": x, "y": y, "z": z,
@@ -576,7 +582,8 @@ class PlotlyPlotter(Plotter):
             "customdata": list(items),
         }
 
-    def _get_nodes(self, displ=None):
+    def _get_nodes(self, displ=None, name=None):
+        if name is None: name = "nodes"
         xyz = self.model["coord"].T[self.axes]
         if not displ:
             x,y,z = xyz
@@ -591,7 +598,7 @@ class PlotlyPlotter(Plotter):
             )
             
         return {
-                "name": "nodes",
+                "name": name,
                 "x": x, "y": y, "z": z,
                 "type": "scatter3d","mode": "markers",
                 "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
@@ -599,7 +606,8 @@ class PlotlyPlotter(Plotter):
                 "marker": {
                     "symbol": "square",
                     **self.opts["objects"]["nodes"]["default"]
-                }
+                },
+                "showlegend": False
         }
 
     def _get_frame_labels(self):
@@ -633,39 +641,70 @@ class PlotlyPlotter(Plotter):
             "mode": "lines",
             "x": x, "y": y, "z": z,
             "line": {"color":props["color"]},
-            "hoverinfo":"skip"
+            "hoverinfo":"skip",
+            "showlegend": False
         }]
 
-
-def plot_plotly(model, axes=None, displ=None, opts={}):
+def plotly_subplots(model, axes, displ, opts):
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
-
     plt = PlotlyPlotter(model,axes=axes,opts=opts)
     frames = plt._get_frames()
     labels = plt._get_frame_labels()
-    if opts["mode_num"] is None and displ is not None:
-        nrows = len(displ)
-        fig = make_subplots(rows=nrows, cols=1, specs=[[{"type": "scene"}]]*len(displ))
-        for i, (mode_num, mode_shape) in enumerate(displ.items()):
-            nodes = plt._get_nodes(displ=mode_shape)
-            for data in [*frames, labels, nodes, plt._get_displ(mode_shape)]:
-                fig.add_trace(data, row = i+1, col = 1)
-            fig.update_layout(
-                go.Layout(
-                    **{f"scene{i+1}": dict(aspectmode='data',
-                         xaxis_visible=False,
-                         yaxis_visible=False,
-                         zaxis_visible=False,
-                         camera=dict(
-                             projection={"type": opts["camera"]["projection"]}
-                         )
-                        )
-                    },
-                    showlegend=False
-                )
+    nrows = len(displ)
+    fig = make_subplots(rows=nrows, cols=1, specs=[[{"type": "scene"}]]*len(displ))
+    for i, (mode_num, mode_shape) in enumerate(displ.items()):
+        nodes = plt._get_nodes(displ=mode_shape)
+        for data in [*frames, labels, nodes, plt._get_displ(mode_shape)]:
+            fig.add_trace(data, row = i+1, col = 1)
+        fig.update_layout(
+            go.Layout(
+                **{f"scene{i+1}": dict(aspectmode='data',
+                     xaxis_visible=False,
+                     yaxis_visible=False,
+                     zaxis_visible=False,
+                     camera=dict(
+                         projection={"type": opts["camera"]["projection"]}
+                     )
+                    )
+                },
+                showlegend=False
             )
+        )
+    return fig
+
+def plotly_many(model, axes, displ, opts):
+    import plotly.graph_objects as go
+    plt = PlotlyPlotter(model,axes=axes,opts=opts)
+    frames = plt._get_frames()
+    labels = plt._get_frame_labels()
+    #nodes = [plt._get_nodes(displ=shp) for n,shp in displ.items()]
+    nodes = plt._get_nodes()
+    fig = go.Figure(dict(
+            data=[*frames, labels, nodes] + [plt._get_displ(shp, n) for n,shp in displ.items()],
+            layout=go.Layout(
+                scene=dict(aspectmode="data",
+                     xaxis_visible=False,
+                     yaxis_visible=False,
+                     zaxis_visible=False,
+                     camera=dict(
+                         projection={"type": opts["camera"]["projection"]}
+                     )
+                ),
+                showlegend=True
+            )
+        ))
+    return fig
+
+def plot_plotly(model, axes=None, displ=None, opts={}):
+    import plotly.graph_objects as go
+
+    if opts["mode_num"] is None and displ is not None and len(displ) > 0:
+        return plotly_many(model, axes, displ, opts)
     else:
+        plt = PlotlyPlotter(model,axes=axes,opts=opts)
+        frames = plt._get_frames()
+        labels = plt._get_frame_labels()
         nodes = plt._get_nodes(displ=displ)
         fig = go.Figure(dict(
                 #go.Scatter3d(**plot_skeletal_plotly(model,axes)),
@@ -697,7 +736,7 @@ def parse_args(argv)->dict:
         with open(".render.yaml", "r") as f:
             presets = yaml.load(f, Loader=yaml.Loader)
 
-        apply_config(presets,opts)
+        _apply_config(presets,opts)
 
     args = iter(argv[1:])
     for arg in args:
@@ -762,13 +801,15 @@ def parse_args(argv)->dict:
             #    opts["displ_only"] = True
 
             # Final check on options
-            elif arg[0] == "-":
+            elif arg[0] == "-" and len(arg) > 1:
                 raise RenderError(f"ERROR - unknown option '{arg}'")
 
             elif not opts["sam_file"]:
+                if arg == "-": arg = sys.stdin
                 opts["sam_file"] = arg
 
             else:
+                if arg == "-": arg = sys.stdin
                 opts["res_file"] = arg
 
         except StopIteration:
@@ -818,7 +859,7 @@ def render(sam_file, res_file=None, **opts):
     model = read_model(sam_file)
 
     if "config" in model:
-        apply_config(model["config"], opts)
+        _apply_config(model["config"], opts)
     
     axes = opts["orientation"]
 
@@ -829,18 +870,23 @@ def render(sam_file, res_file=None, **opts):
     #
     # Handle displacements
     #
-    if res_file is not None:
+    if isinstance(res_file,str):
         from urllib.parse import urlparse
         res_path = urlparse(res_file)
         with open(res_path[2], "r") as f:
             res = yaml.load(f,Loader=yaml.Loader)
         if res_path[4]: # query parameters passed
             res = res[int(res_path[4].split("=")[-1])]
-        elif opts["mode_num"]: # query parameters passed
+        elif opts["mode_num"] is not None: # query parameters passed
             res = res[int(opts["mode_num"])]
 
-    else:
+    elif res_file is None:
         res = {}
+    else:
+        res = yaml.load(res_file,Loader=yaml.Loader)
+        if opts["mode_num"] is not None: # query parameters passed
+            res = res[int(opts["mode_num"])]
+
 
 
     for n,d in opts["displ"]:
@@ -854,27 +900,32 @@ def render(sam_file, res_file=None, **opts):
     scale = opts["scale"]
     if scale != 1.0:
         if opts["mode_num"] is None:
-            if scale != 1.0:
+             if scale != 1.0:
                 for shp in res.values():
                     for n in shp.values():
                         for i in range(len(n)):
-                            n[i] *= scale
+                            if np.abs(n[i]) < 1e-14:
+                                n[i] = 0.0
+                            else:
+                                n[i] *= scale
         else:
             for n in res.values():
                 for i in range(len(n)):
+                    if np.abs(n[i]) < 1e-14: continue
                     n[i] *= scale
 
-
-
-    if opts["write_file"]:
     # write plot to file if file name provided
+    if opts["write_file"]:
         if "html" in opts["write_file"]:
             fig = plot_plotly(model,axes,displ=res,opts=opts)
             import plotly
-            print(str(id(model)),file=sys.stderr)
             html = plotly.io.to_html(fig, div_id=str(id(model)), **opts["save_options"]["html"])
             with open(opts["write_file"],"w+") as f:
                 f.write(html)
+        elif "json" in opts["write_file"]:
+            fig = plot_plotly(model,axes,displ=res,opts=opts)
+            with open(opts["write_file"],"w+") as f:
+                fig.write_json(f)
         else:
             ax.figure.savefig(opts["write_file"])
     elif opts["plotter"] == "plotly":
@@ -884,10 +935,19 @@ def render(sam_file, res_file=None, **opts):
     else:
         # Matplotlib
         ax = plot_skeletal(model, axes=axes)
+        #if opts["mode_num"] is None:
+        #    for shp in res.values():
+        #        ax = plot_nodes(model, shp, ax=ax, axes=axes)
+        #    if res:
+        #        plot_displ(model, res, axes=axes, ax=ax)
+        #else:
+        #    ax = plot_nodes(model, res, ax=ax, axes=axes)
+        #    if res:
+        #        plot_displ(model, res, axes=axes, ax=ax)
         ax = plot_nodes(model, res, ax=ax, axes=axes)
-
         if res:
             plot_displ(model, res, axes=axes, ax=ax)
+
 
         # Handle plot formatting
         set_axis_limits(ax)
@@ -905,15 +965,7 @@ def render(sam_file, res_file=None, **opts):
 
 if __name__ == "__main__":
     opts = parse_args(sys.argv)
-    if "json" in opts["sam_file"]:
-        # Plot structural model
-        try:
-            render(**opts)
-        except (FileNotFoundError,RenderError) as e:
-            print(e, file=sys.stderr)
-            print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
-            sys.exit()
-    else:
+    if "py" in opts["sam_file"]:
         # Plot a cross section
         from urllib.parse import urlparse
         file = urlparse(opts["sam_file"])
@@ -924,4 +976,13 @@ if __name__ == "__main__":
         plt = MplPlotter()
         plt.plot_section(scope[file.fragment])
 
+
+    else: # "json" in opts["sam_file"] or opts["sam_file"] == "-":
+        # Plot structural model
+        try:
+            render(**opts)
+        except (FileNotFoundError,RenderError) as e:
+            print(e, file=sys.stderr)
+            print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
+            sys.exit()
 
