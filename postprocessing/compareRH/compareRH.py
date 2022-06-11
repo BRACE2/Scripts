@@ -81,7 +81,7 @@ def RMS(sensorRH, modelRH):
 def AMX(sensorRH, modelRH):
     acp = max(abs(modelRH))
     amp = max(abs(sensorRH))
-    out = (acp-amp)/amp
+    out = 100*(acp-amp)/amp
     print(out)
 
 def CAV(sensorRH, modelRH):
