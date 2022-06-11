@@ -22,11 +22,19 @@ def damage_states(Dcol):
     Rcol = Dcol/2
     coverl = cover + Rcol*(1-np.cos(np.pi/8))
     return {
-        "dsr1" : {
+        "dsr0": {
             "regions": [
-                 # external radius    internal radius
-                section.PolygonRing(8, Rcol,         Rcol-coverl/4)
+                # external radius    internal radius
+                section.PolygonRing(8, Rcol, Rcol - coverl / 4)
             ]
+        },
+        "dsr1": {
+            "regions": [
+                section.FiberSection(areas=[
+                    patch.circ(intRad=Rcol - cover - 2, extRad=Rcol - cover)
+                ])
+            ],
+            "material": "*steel*"
         },
         "dsr2" : {
             "regions": [
