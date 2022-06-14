@@ -10,8 +10,7 @@ import numpy as np
 
 NAME = "compareRH.py"
 
-# METRICS = ["RelDiff", "AbsDiff", "RelRMS", "AbsRMS", "RelAMX", "AbsAMX", "RelCAV", "AbsCAV"]
-METRICS = ["RelDiff", "AbsDiff", "RMS", "AMX", "CAV"]
+METRICS = ["Diff", "RMS", "AMX", "CAV"]
 
 HELP = f"""
 usage: {NAME} <metric> <sensorRH-file> <modelRH-file>
@@ -22,7 +21,7 @@ Positional Arguments:
   <metric>                       string defining desired RH comparison metric.
                                  one of the following metrics:
                                  {METRICS}.
-  <sensorRH-file>                text file of sensor response history.
+  <sensorRH-file>                text file of sensor response history, or - if from stdin
   <modelRH-file>                 text file of model output response history.
 
 Options:
@@ -57,18 +56,12 @@ def parse_args(argv) -> dict:
             if arg == "-": arg = sys.stdin
             opts["sensorRH-file"] = arg
         else:
-            if arg == "-": arg = sys.stdin
             opts["modelRH-file"] = arg
     return opts
 
 # Helper functions for each metric
-def RelDiff(sensorRH, modelRH):
+def Diff(sensorRH, modelRH):
     out = modelRH - sensorRH
-    for diff in out:
-        print(diff)
-
-def AbsDiff(sensorRH, modelRH):
-    out = np.abs(modelRH - sensorRH)
     for diff in out:
         print(diff)
 
@@ -90,23 +83,11 @@ def CAV(sensorRH, modelRH):
     out = 100*(modelCAV - sensorCAV) / sensorCAV
     print(out)
 
-# Function dictionary for metrics
-# func_dict = {
-#     METRICS[0] : RelDiff,
-#     METRICS[1] : AbsDiff,
-#     METRICS[2] : RelRMS,
-#     METRICS[3] : AbsRMS,
-#     METRICS[4] : RelAMX,
-#     METRICS[5] : AbsAMX,
-#     METRICS[6] : RelCAV,
-#     METRICS[7] : AbsCAV,
-# }
 func_dict = {
-    METRICS[0] : RelDiff,
-    METRICS[1] : AbsDiff,
-    METRICS[2] : RMS,
-    METRICS[3] : AMX,
-    METRICS[4] : CAV,
+    METRICS[0] : Diff,
+    METRICS[1] : RMS,
+    METRICS[2] : AMX,
+    METRICS[3] : CAV,
 }
 
 
