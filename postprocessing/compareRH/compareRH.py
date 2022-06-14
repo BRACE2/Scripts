@@ -31,7 +31,7 @@ Options:
 EXAMPLES="""
 Examples:
     Compare the relative difference between the RH in `sensorRH.txt` and `modelRH.txt`:
-        $ {NAME} RelDiff sensorRH.txt modelRH.txt
+        $ {NAME} Diff sensorRH.txt modelRH.txt
 """
 
 
