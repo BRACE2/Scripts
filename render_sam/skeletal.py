@@ -125,7 +125,6 @@ Config = lambda : {
   "mode_num"    : None,
   "hide_objects": ["origin"],
   "sam_file":     None,
-  "elem_by_type": False,
   "res_file":     None,
   "write_file":   None,
   "displ":        defaultdict(list),
@@ -306,9 +305,13 @@ def displaced_profile(
     n = npoints
     #           (------ndm------)
     reps = 4 if len(coord[0])==3 else 2
+
+    # 3x3 rotation to local system
     Q = rotation(coord, vect)
-    L = np.linalg.norm(coord[1] - coord[0])
+    # Local displacements
     u_local = block_diag(*[Q]*reps)@displ
+    # Element length
+    L = np.linalg.norm(coord[1] - coord[0])
 
     # longitudinal, transverse, vertical, section, elevation, plan
     li, ti, vi, si, ei, pi = u_local[:6]
@@ -608,6 +611,9 @@ class MatplotlibCanvas:
 
     def plot_vectors(self, locs, vecs, **kwds):
         self.ax.quiver(*locs, *vecs, arrow_length_ratio=0.1, color="black")
+
+    def plot_trisurf(self, xyz, ijk):
+        ax.plot_trisurf(*xyz.T, triangles=ijk)
     
 
 
@@ -633,7 +639,7 @@ class PlotlyCanvas:
                          projection={"type": opts["camera"]["projection"]}
                      )
                   ),
-                  showlegend=False
+                  showlegend=True
                 )
             ))
         self.fig = fig
@@ -743,7 +749,6 @@ def parse_args(argv)->dict:
 
             elif arg == "--gnu":
                 opts["plotter"] = "gnu"
-
             elif arg == "--plotly":
                 opts["plotter"] = "plotly"
 
@@ -762,11 +767,15 @@ def parse_args(argv)->dict:
                 for nd in node_dof.split(","):
                     node, dof = nd.split(":")
                     opts["displ"][int(node)].append(dof_index(dof))
+            elif arg[:6] == "--disp":
+                node_dof = next(args)
+                for nd in node_dof.split(","):
+                    node, dof = nd.split(":")
+                    opts["displ"][int(node)].append(dof_index(dof))
 
 
             elif arg[:2] == "-s":
                 opts["scale"] = float(arg[2:]) if len(arg) > 2 else float(next(args))
-
             elif arg == "--scale":
                 opts["scale"] = float(next(args))
 
@@ -784,9 +793,6 @@ def parse_args(argv)->dict:
             elif arg == "--view":
                 opts["view"] = next(args)
 
-            elif arg == "--elem-by-type":
-                opts["elem_by_type"] = True
-
             elif arg[:2] == "-m":
                 opts["mode_num"] = int(arg[2]) if len(arg) > 2 else int(next(args))
 
@@ -796,8 +802,6 @@ def parse_args(argv)->dict:
                 if "html" in filename or "json" in filename:
                     opts["plotter"] = "plotly"
 
-            #elif arg == "--displ-only":
-            #    opts["displ_only"] = True
 
             # Final check on options
             elif arg[0] == "-" and len(arg) > 1:
@@ -812,7 +816,7 @@ def parse_args(argv)->dict:
                 opts["res_file"] = arg
 
         except StopIteration:
-            # `next(args)` was called without successive arg
+            # `next(args)` was called in parse loop without successive arg
             raise RenderError(f"ERROR -- Argument '{arg}' expected value")
 
     return opts
@@ -855,6 +859,10 @@ TESTS = [
 ]
 
 def render(sam_file, res_file=None, **opts):
+    # Configuration is determined by successively layering
+    # from sources with the following priorities:
+    #      defaults < file configs < kwds 
+
     config = Config()
 
 
@@ -871,8 +879,6 @@ def render(sam_file, res_file=None, **opts):
         _apply_config(model["RendererConfiguration"], config)
 
     _apply_config(opts, config)
-
-
 
     renderer = SkeletalRenderer(model, **config)
 
@@ -904,6 +910,8 @@ if __name__ == "__main__":
     try:
         render(**config)
     except (FileNotFoundError,RenderError) as e:
+        # Catch expected errors to avoid printing an ugly/unnecessary
+        # stack trace.
         print(e, file=sys.stderr)
         print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
         sys.exit()
