@@ -16,7 +16,7 @@ def print_help():
     fiberStrains.py -a dataDir -dsr dsr -ele elems -sec sec ...
 
     a is path to directory with either section deformation (xml format) or fiber strain (file format) recorder output file.  e.g., datahwd10.1/GM1, or datahwd_col_4010_po, etc.
-    dsr can be any set of: [dsr1 dsr2 dsr3 dsr4 dsr5 dsr6 all], or "6ds".  6ds is equivalent to dsr1,2,...,6.
+    dsr can be any set of: [dsr0 dsr1 dsr2 dsr3 dsr4 dsr5 dsr6 all], or "7ds".  7ds is equivalent to dsr0,1,2,...,6.
     ele are the set of elements studied, e.g. 3020,4010,4020, or "all" if all (non-interlocking) columns. If not specified, default is 4010.
     sec can be any one of: [1 np], where np is integer representing last integration point.
     
@@ -141,7 +141,7 @@ def yieldpt(X, Y, eps, times):
                 (coordsYieldedFibers, epsYieldedFibers, [t]*len(coordsYieldedFibers)) ), 
                 columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint"]
             )
-            yieldSummary.to_csv(a+"YieldSummary.csv", index=False)
+            yieldSummary.to_csv(opts["a"]+"YieldSummary.csv", index=False)
             print("the coordinates and corresponding strains of yielded fibers are:")
             print(yieldSummary)
             plt.figure(figsize=(6, 5))
@@ -155,7 +155,7 @@ def yieldpt(X, Y, eps, times):
             plt.xlim([-50, 50])
             plt.ylim([-50, 50])
             plt.legend()
-            plt.gcf().savefig(a+"YieldPoint.png")
+            plt.gcf().savefig(opts["a"]+"YieldPoint.png")
             # plt.show()
             return timeYield, coordsYieldedFibers, epsYieldedFibers
 
@@ -187,7 +187,7 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             )
             ultSummary6 = pd.DataFrame(np.column_stack( (coordsUltFibers6, epsUltFibers6, [t]*len(coordsUltFibers6), ["steel"]*len(coordsUltFibers6)) ), columns = ["Fiber X Coord", "Fiber Y Coord", "Strain", "Timepoint", "Material"])
             ultSummary = ultSummary5.append(ultSummary6)
-            ultSummary.to_csv(a+"UltimateSummary.csv", index=False)
+            ultSummary.to_csv(opts["a"]+"UltimateSummary.csv", index=False)
             print("the coordinates and corresponding strains of failed fibers are:")
             print(ultSummary)
             plt.figure(figsize=(6, 5))
@@ -201,17 +201,17 @@ def ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6):
             plt.xlim([-50, 50])
             plt.ylim([-50, 50])
             plt.legend()
-            plt.gcf().savefig(a+"UltimatePoint.png")
+            plt.gcf().savefig(opts["a"]+"UltimatePoint.png")
             # plt.show()
             return timeUlt, list(coordsUltFibers5).append(list(coordsUltFibers6)), list(epsUltFibers5).append(list(epsUltFibers6))
 
 def get_DS(a, sec, model, elems):
-    dsrs = ["dsr6", "dsr5", "dsr4", "dsr3", "dsr2", "dsr1"]
-    thresholds = [0.09, -0.011, -0.005, -0.005, -0.005, 1.32e-4]
+    dsrs = ["dsr6", "dsr5", "dsr4", "dsr3", "dsr2", "dsr1", "dsr0"]
+    thresholds = [0.09, -0.011, -0.005, -0.005, -0.005, 0.002, 1.32e-4]
     if not os.path.exists(a+"/DSsummaries"):
         os.makedirs(a+"/DSsummaries")
     # Get timepoints at which each strain-based damage state occurs.
-    timeDS = np.zeros([len(dsrs)+1, len(elems)])
+    timeDS = np.zeros([len(dsrs), len(elems)])
     for i in range(len(dsrs)):  # For each DS / corresponding section region
         dsr = dsrs[i]
         th = thresholds[i]
@@ -233,13 +233,14 @@ def get_DS(a, sec, model, elems):
                     DSsummary.to_csv(a+"/DSsummaries/"+str(elems[j])+"DS"+str(6-i)+"Summary.csv", index=False)
                     # print("For element " + str(elems[j]) + ", the coordinates and corresponding strains of failed fibers at DS", 6-i, " are:")
                     # print(DSsummary)
-                    plt.figure(figsize=(6, 5))
+                    plt.figure(figsize=(5, 4))
                     plt.scatter(X, Y, c=epst, vmin=-0.01, vmax=0.01)
                     plt.colorbar(label="strain")
                     plt.scatter(XDSFibers, YDSFibers, marker='x', color="r", label="Failed Fibers at DS"+str(6-i))
                     plt.xlabel("Section Horizontal (X) Axis [inches]")
                     plt.ylabel("Section Vertical (Y) Axis [inches]")
                     plt.title("Element " + str(elems[j]) + ", strains at point of DS"+str(6-i)+" (timepoint " + str(t) + ")")
+                    plt.tight_layout()
                     plt.grid()
                     plt.xlim([-50, 50])
                     plt.ylim([-50, 50])
@@ -258,35 +259,36 @@ def get_DS(a, sec, model, elems):
     print("maxDSele", maxDSele)
     DSbyEle = pd.DataFrame(np.column_stack((elems, maxDSele, timeMaxDSele)), columns=["Element", "DS", "Timepoint of DS"])
     DSbyEle.to_csv(a+"/DamageStatesByElement.csv", index=False)
-    return maxDSele, timeMaxDSele
+    return maxDSele, timeMaxDSele, timeDS
 
 def getPushover(a, timeYield, timeUlt, timeDS):
     if "po" not in a:
         return None
     else:
         dataDir = os.getcwd() + "/" + a
-        curv = -(np.loadtxt(dataDir+"/eleDef1.txt"))[:,2]
-        mom = -(np.loadtxt(dataDir+"/eleForce1.txt"))[:,2]
+        # MOMENT CURVATURE PLOT NEEDS FIXING (to be able to read eleDef in xml.  Or, provide another eleDef that's non-xml.)
+        # curv = -(np.loadtxt(dataDir+"/eleDef1.txt"))[:,2]
+        # mom = -(np.loadtxt(dataDir+"/eleForce1.txt"))[:,2]
 
-        # Plot moment-curvature and yield and ultimate points
-        plt.figure(figsize=(6, 5))
-        plt.plot(np.append([0],curv), np.append([0],mom), zorder=0)
-        curvYield = curv[timeYield]
-        momYield = mom[timeYield]
-        curvUlt = curv[timeUlt]
-        momUlt = mom[timeUlt]
-        print("\nYield curvature = ", curvYield, " rad/in, Yield moment = ", momYield, " kip-in")
-        print("Ultimate curvature = ", curvUlt, " rad/in, Ultimate moment = ", momUlt, " kip-in")
-        plt.scatter(curvYield, momYield, label="Yield Point ("+str(curvYield)+", "+str(momYield)+")", marker="o", color=[0.0, 0.0, 0.0])
-        plt.scatter(curvUlt, momUlt, label="Ultimate Point ("+str(curvUlt)+", "+str(momUlt)+")", marker="s", color=[0.0, 0.0, 0.0])
-        plt.xlabel("Curvature [rad/in]")
-        plt.ylabel("Moment [kip-in]")
-        plt.title("Pushover Curve - Moment Curvature Analysis")
-        plt.legend()
-        plt.grid()
-        plt.tight_layout()
-        plt.gcf().savefig(a+"Pushover.png")
-        # plt.show()
+        # # Plot moment-curvature and yield and ultimate points
+        # plt.figure(figsize=(6, 5))
+        # plt.plot(np.append([0],curv), np.append([0],mom), zorder=0)
+        # curvYield = curv[timeYield]
+        # momYield = mom[timeYield]
+        # curvUlt = curv[timeUlt]
+        # momUlt = mom[timeUlt]
+        # print("\nYield curvature = ", curvYield, " rad/in, Yield moment = ", momYield, " kip-in")
+        # print("Ultimate curvature = ", curvUlt, " rad/in, Ultimate moment = ", momUlt, " kip-in")
+        # plt.scatter(curvYield, momYield, label="Yield Point ("+str(curvYield)+", "+str(momYield)+")", marker="o", color=[0.0, 0.0, 0.0])
+        # plt.scatter(curvUlt, momUlt, label="Ultimate Point ("+str(curvUlt)+", "+str(momUlt)+")", marker="s", color=[0.0, 0.0, 0.0])
+        # plt.xlabel("Curvature [rad/in]")
+        # plt.ylabel("Moment [kip-in]")
+        # plt.title("Pushover Curve - Moment Curvature Analysis")
+        # plt.legend()
+        # plt.grid()
+        # plt.tight_layout()
+        # plt.gcf().savefig(a+"Pushover.png")
+        # # plt.show()
 
         # Plot force-displacement with PDCA and strain-based DS
         disp = (np.loadtxt(dataDir+"/nodeDisp.txt"))[:,0]
@@ -307,7 +309,7 @@ def getPushover(a, timeYield, timeUlt, timeDS):
             plt.scatter(disp[diPoint], force[diPoint], label="PDCA DS " + str(i+1), marker="o")
         for i in range(len(timeDS)):
             tDS = int(timeDS[-i-1])
-            plt.scatter(disp[tDS], force[tDS], label="Strain-Based DS " + str(i+1), marker="x")
+            plt.scatter(disp[tDS], force[tDS], label="Strain-Based DS " + str(i), marker="x")
         plt.legend()
         plt.grid()
         plt.tight_layout()
@@ -386,8 +388,8 @@ if __name__ == "__main__":
     with open(opts["a"]+"/modelDetails.json", "r") as f:
         model = json.load(f)
 
-    if opts["dsr"] == ["6ds"]:
-        opts["dsr"] = ["dsr1","dsr2","dsr3","dsr4","dsr5","dsr6"]
+    if opts["dsr"] == ["7ds"]:
+        opts["dsr"] = ["dsr0","dsr1","dsr2","dsr3","dsr4","dsr5","dsr6"]
 
     if opts["elems"] is None:
         opts["elems"] = [4010]
@@ -418,15 +420,20 @@ if __name__ == "__main__":
 
     if np.all(np.isin(["dsr1", "dsr2", "dsr3", "dsr4", "dsr5", "dsr6"], opts["dsr"])):
         print("Calculating Strain-Based Damage States...")
-        dsr, timeDS = get_DS(opts["a"], opts["sec"], model, opts["elems"])
+        dsr, timeMaxDSele, timeDS = get_DS(opts["a"], opts["sec"], model, opts["elems"])
 
     if np.isin("dsr6", opts["dsr"]) and np.isin("dsr5", opts["dsr"]) and 'po' in opts["a"]:
-        X6, Y6, eps6, intFrames6, times6 = getStrains(opts["a"], ["dsr6"], opts["sec"])
-        timeYield, coordsYieldedFibers, epsYieldedFibers = yieldpt(X6, Y6, eps6, times6)
-
-        X5, Y5, eps5, intFrames5, times5 = getStrains(opts["a"], ["dsr5"], opts["sec"])
-        timeUlt, coordsUltFibers, epsUltFibers = ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6)
-
+        # NEEDS FIXING
+        # epsEle6 = getDamageStateStrains(opts["a"], ["dsr6"], opts["sec"], model, opts["elems"])
+        # X6, Y6, eps6, intFrames6, times6 = epsEle6[0]
+        # timeYield, coordsYieldedFibers, epsYieldedFibers = yieldpt(X6, Y6, eps6, times6)
+        #
+        # epsEle5 = getDamageStateStrains(opts["a"], ["dsr5"], opts["sec"], model, opts["elems"])
+        # X5, Y5, eps5, intFrames5, times5 = epsEle5[0]
+        # timeUlt, coordsUltFibers, epsUltFibers = ultimatePt(X5, Y5, eps5, times5, X6, Y6, eps6, times6)
+        timeYield = 7
+        timeUlt = 100
+        print("timeDS", timeDS)
         getPushover(opts["a"], timeYield, timeUlt, timeDS)
 
     if "cyclic" in opts["a"]:
