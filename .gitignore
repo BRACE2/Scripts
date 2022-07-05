@@ -1,3 +1,6 @@
 .ipynb_checkpoints/
 __pycache__/
 
+postprocessing/bashFiberStrains.sh
+postprocessing/bashGuide.sh
+postprocessing/plotRH.py
