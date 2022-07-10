@@ -25,3 +25,7 @@ for model in $(find -maxdepth 1 -name "hwd*.tcl"); do
     # python ../../Scripts/compareRH.py sensorRH.out datahwd10.1.$i/RH.out &&
     # python ../../Scripts/png2md.py datahwd10.1.$i/plot.png &&
 done
+
+
+python compareRH.py Diff ../../CalTrans.Hayward/Procedures/datahwd10.3.0/model/AA_Ch19-20_X.txt ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_X.txt
+python ../preprocessing/makePattern.py ../../CalTrans.Hayward/Procedures/Records/berkeley_04jan2018_72948801_ce58658p.zip --accel

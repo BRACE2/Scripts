@@ -7,6 +7,7 @@
 
 import sys
 import numpy as np
+from matplotlib import pyplot as plt
 
 NAME = "compareRH.py"
 
@@ -99,3 +100,7 @@ if __name__ == "__main__":
     sensorRH = np.loadtxt(opts["sensorRH-file"])
     modelRH = np.loadtxt(opts["modelRH-file"])
     func_dict[opts["metric"]](sensorRH, modelRH)
+    plt.plot(np.arange(len(sensorRH)), sensorRH, label="sensor")
+    plt.plot(np.arange(len(modelRH)), modelRH, label="model")
+    plt.legend()
+    plt.show()
