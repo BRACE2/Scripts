@@ -24,5 +24,5 @@ pip install -U quakeio opensees
 
 2. Example: write file named ```displ.yaml``` with displacement data
     ```
-    python getSensorResponse.py filename.zip --displ > displ.y
+    python getSensorResponse.py filename.zip --displ > displ.yaml
     ```

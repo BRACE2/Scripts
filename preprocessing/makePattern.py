@@ -53,17 +53,25 @@ DOFS = {"long": 1,
 
 
 
-def get_motion(filename, location):
-    return quakeio.read(filename).match("l", key=location)
+def get_motion(filename, location, rotation=None, vertical=-3, scale=1.0):
+    motion =  quakeio.read(filename).match("l", key=location)
+    if vertical < 0:
+        motion.components["tran"].accel._data *= -1
+    if rotation is not None:
+        motion.rotate(rotation)
+    return motion
 
 
-def get_patterns(motion, rotation, scale=1.0):
-    motion.components["tran"].accel._data *= -1
-    motion.rotate(rotation)
+def get_patterns(motion,  scale=1.0):
+    # motion.components["tran"].accel._data *= -1
+    # motion.rotate(rotation)
+    for component in motion.components.values():
+        component.accel._data *= scale
     return [
-            opensees.pattern.UniformExcitation(None, dof, motion.components[drn].accel, scale=scale)
+            opensees.pattern.UniformExcitation(None, dof, motion.components[drn].accel)
                 for drn, dof in DOFS.items()
     ]
+
 
 
 
@@ -102,11 +110,12 @@ if __name__ == "__main__":
     # Hard-coded options
     #
 
+    # scale = 1
     scale = 0.393700787     # cm/s^2 to in/s^2
     # scale = 0.00101971621   # cm/s^2 to g
 
     # rotation angle in radians
-    rotation = 26.26*pi/180
+    rotation =-26.26*pi/180
 
     location = "bent_4_south_column_grnd_level"
     #          "abutment_1"
@@ -137,26 +146,31 @@ if __name__ == "__main__":
     else:
         format = "tcl"
 
+    if len(sys.argv) > 3:
+        component = sys.argv[3]
+    else:
+        component = None
 
     #
     # Process motion
     #
 
-    motion = get_motion(filename, location)
+    motion = get_motion(filename, location, rotation)
 
 
     if format == "tcl":
-        patterns = get_patterns(motion, rotation, scale=scale)
+        patterns = get_patterns(motion, scale=scale)
 
         first_component = next(iter(motion.components.values())).accel
         dt, steps = first_component["time_step"], len(first_component.data)
-
 
         print(opensees.tcl.dumps(patterns))
         print(f"set _dummy_ {{ {dt} {steps} }}")
 
     elif format in ["accel", "displ", "veloc"]:
         array = scale*getattr(motion, format)
+        if component is not None:
+            array = array[:,int(component)]
         np.savetxt(sys.stdout.buffer, array)
 
     else:

@@ -17,6 +17,7 @@ HELP = f"""
 usage: {NAME} <metric> <sensorRH-file> <modelRH-file>
 
 Obtain errors and differences between model and sensor response histories.
+Plot response histories against each other.
 
 Positional Arguments:
   <metric>                       string defining desired RH comparison metric.
@@ -91,16 +92,66 @@ func_dict = {
     METRICS[3] : CAV,
 }
 
+def husid(accRH, plot=False, dt=None, lb=0.05, ub=0.95):
+    AI = np.tril(np.ones(len(accRH)))@accRH**2
+    husid = AI/AI[-1]
+    ilb = next(x for x, val in enumerate(husid) if val > lb)
+    iub = next(x for x, val in enumerate(husid) if val > ub)
+    if dt is not None:
+        print("duration between ", f"{100*lb}%", " and ", f"{100*ub}%", " (s): ", dt*(iub-ilb))
+    if plot:
+        fig, ax = plt.subplots()
+        if dt is not None:
+            ax.plot(dt*np.arange(len(accRH)), husid)
+            ax.set_xlabel("time (s)")
+        else:
+            ax.plot(np.arange(len(accRH)), husid)
+            ax.set_xlabel("timestep")
+        ax.axhline(husid[ilb], linestyle=":", label=f"{100*lb}%")
+        ax.axhline(husid[iub], linestyle="--", label=f"{100*ub}%")
+        ax.set_title("Husid Plot")
+        ax.legend()
+        plt.show()
+    return (ilb, iub)
+
+def plot(sensorRH, modelRH, window=None, dt=None):
+    if window is not None:
+        ts=window
+    else:
+        ts=(0,-1)
+    fig, ax = plt.subplots()
+    if dt is not None:
+        ax.plot(dt*np.arange(len(sensorRH))[ts[0]:ts[1]], sensorRH[ts[0]:ts[1]], linewidth=0.75, label="sensor")
+        ax.plot(dt*np.arange(len(modelRH))[ts[0]:ts[1]], modelRH[ts[0]:ts[1]], ":", linewidth=1.5, label="model")
+        ax.set_xlabel("time (s)")
+    else:
+        ax.plot(np.arange(len(sensorRH))[ts[0]:ts[1]], sensorRH[ts[0]:ts[1]], linewidth=0.75, label="sensor")
+        ax.plot(np.arange(len(modelRH))[ts[0]:ts[1]], modelRH[ts[0]:ts[1]], ":", linewidth=1.5, label="model")
+        ax.set_xlabel("timestep")
+    ax.legend()
+    plt.show()
+
 
 # Main script
 #----------------------------------------------------
 
 if __name__ == "__main__":
     opts = parse_args(sys.argv)
-    sensorRH = np.loadtxt(opts["sensorRH-file"])
+    if ".yaml" in opts["sensorRH-file"]:
+        import yaml # pip install pyyaml
+        with open(opts["sensorRH-file"], "r") as f:
+            sensorData = yaml.load(f, Loader=yaml.Loader)
+            # sensorData = json.load(f)
+        
+        sensorRH = ... # reshape
+
+    else:
+        sensorRH = np.loadtxt(opts["sensorRH-file"])
     modelRH = np.loadtxt(opts["modelRH-file"])
     func_dict[opts["metric"]](sensorRH, modelRH)
-    plt.plot(np.arange(len(sensorRH)), sensorRH, label="sensor")
-    plt.plot(np.arange(len(modelRH)), modelRH, label="model")
-    plt.legend()
-    plt.show()
+    if "AA" in opts["sensorRH-file"] or "acc" in opts["sensorRH-file"]:
+        window = husid(sensorRH, plot=True, dt=0.005, lb=0.0005, ub=0.9995)
+    else:
+        window = None
+    # window = husid(sensorRH, plot=True, dt=0.005, lb=0.005, ub=0.995)
+    plot(sensorRH, modelRH, window=window, dt=0.005)
