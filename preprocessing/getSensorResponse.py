@@ -3,7 +3,6 @@
 import sys
 from math import pi
 from collections import defaultdict
-
 import quakeio
 
 
@@ -38,7 +37,7 @@ def print_node_values(nodes):
     i = 0
     while True:
         try:
-            string = "\n".join(f"\t{node}: [{','.join(str(nodes[node][dof][i]) if dof in nodes[node] else '0.0' for dof in range(1,ndf+1))}]"
+            string = "\n".join(f"  {node}: [{','.join(str(nodes[node][dof][i]) if dof in nodes[node] else '0.0' for dof in range(1,ndf+1))}]"
                     for node, dofs in nodes.items()
             )
 
@@ -54,7 +53,8 @@ if __name__ == "__main__":
     # Hard-coded options
     #
 
-    scale = 1.0
+    # scale = 1.0
+    scale = 0.393700787     # cm/s^2 to in/s^2
 
     # rotation angle in radians
 
