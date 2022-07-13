@@ -215,9 +215,9 @@ if __name__ == "__main__":
     # time window to significant duration portion of the record.
     if "AA" in opts["trueRH-file"] or "acc" in opts["trueRH-file"]:
         window = husid(trueRH, opts["plothusid"], opts["dt"], lb=0.005, ub=0.995)
-        if opts["dt"] is not None:
+        if opts["dt"] is not None and opts["plothusid"]:
             print("time window containing significant duration of Arias intensity (s)", opts["dt"]*window[0], ",", opts["dt"]*window[1])
-        else:
+        elif opts["plothusid"]:
             print("time window containing significant duration of Arias intensity (timestep)", window)
     else:
         window = None

@@ -51,7 +51,7 @@ done
 # python compareRH.py RMS ../../CalTrans.Hayward/Procedures/datahwd10.3.0/model/AA_Ch19-20_X.txt ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_X.txt -p
 # python compareRH.py RMS ../../CalTrans.Hayward/Procedures/datahwd10.4.0/model/AA_Ch19-20_X.txt ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_X.txt -p
 # python compareRH.py RMS ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_X.txt ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_X.txt -p
-# python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_X.txt -p
-# python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_Y.txt -d 2 -p
-# python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_X.txt -p
-# python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_Y.txt -d 2 -p
+# time python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_X.txt -p
+# time python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.3.1/model/AA_Ch19-20_Y.txt -d 2 -p
+# time python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_X.txt -p
+# time python compareRH.py RMS accel.yaml ../../CalTrans.Hayward/Procedures/datahwd10.4.1/model/AA_Ch19-20_Y.txt -d 2 -p
