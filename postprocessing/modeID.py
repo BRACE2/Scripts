@@ -42,7 +42,6 @@ def label_unidentified(baseline, unidentified_dict, compare = None, verbose=True
 
         identified_keys.add(_old_labels[index])
         identified[key] = unidentified[index]
-
     return identified
 
 
@@ -76,9 +75,11 @@ if __name__ == "__main__":
     #     }
     # ))
 
-    for k,mode in label_unidentified(baseline, unidentified, compare=compare).items():
-        print(f"{k}:\n\t")
-        print("\n\t".join((f"{node_name}: [{','.join(str(v) for v in node_vals)}]"
-                  for node_name, node_vals in 
-                     zip(node_names, mode.reshape((-1, len(node_names))).T)
-        )))
+    # for k,mode in label_unidentified(baseline, unidentified, compare=compare).items():
+    #     print(f"{k}:\n\t")
+    #     print("\n\t".join((f"{node_name}: [{','.join(str(v) for v in node_vals)}]"
+    #               for node_name, node_vals in 
+    #                  zip(node_names, mode.reshape((-1, len(node_names))).T)
+    #     )))
+
+    label_unidentified(baseline, unidentified, compare=compare)
