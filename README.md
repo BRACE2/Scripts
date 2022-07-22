@@ -29,3 +29,26 @@
   Contributors: @claudioperez, Arpit Nema
 </details>
 
+### Scripts
+complete-ish
+- `quakeio <motion.zip>`
+- `postprocessing/compareRH {method} <sensorRH> <modelRH>`
+- `renderModel <modelDef> [nodalResponse]`
+- `postprocessing/getSensorResponse <event.zip>`
+- `preprocessing/makePattern <event.zip>`
+
+under development
+
+<details><summary><code>fiberStrains <sectionResponse> -> {ele: coords/strains}</code> section response to strains
+</summary>
+
+</details>
+
+
+- `getSBDS <sectionResponse>` strains to damage state
+- `getDrift <groundMotion>`
+- `getPDCA_Damage <drift> <pushover>`
+- `renderState`
+
+### File Types
+
