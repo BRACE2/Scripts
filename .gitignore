@@ -1,3 +1,13 @@
 .ipynb_checkpoints/
 __pycache__/
 
+postprocessing/bashGuide.sh
+postprocessing/hwdBash.sh
+postprocessing/compareRHdev.py
+postprocessing/*.yaml
+preprocessing/test.tcl
+preprocessing/GMscriptsNotes.md
+postprocessing/inputGMlong.txt
+postprocessing/inputGMtrans.txt
+postprocessing/plotVecXZ.py
+postprocessing/png2md.py

@@ -1,3 +1,6 @@
+# Rotates sensor data from local to global coordinate system for hayward bridge.
+
+sensorDataDir = './sensors/'
 import numpy as np
 
 sensorLocs = np.array([ [2, 3],
@@ -33,8 +36,8 @@ for i in range(sensorLocs.shape[0]):
     sensorLoc = sensorLocs[i]
     sensorNo1, sensorNo2 = sensorLoc
 
-    Xin = np.loadtxt(str(sensorNo1)+'.txt')
-    Yin = -np.loadtxt(str(sensorNo2)+'.txt')
+    Xin = np.loadtxt(sensorDataDir+str(sensorNo1)+'.txt')
+    Yin = -np.loadtxt(sensorDataDir+str(sensorNo2)+'.txt')
 
     theta = angles[i]
     MRot = np.array([[np.cos(theta), np.sin(theta)],
@@ -45,5 +48,5 @@ for i in range(sensorLocs.shape[0]):
     chanNo1 = "{:02d}".format(sensorNo1)
     chanNo2 = "{:02d}".format(sensorNo2)
 
-    np.savetxt('AA_Ch' + chanNo1 + '-' + chanNo2 + '_X.txt', Xout)
-    np.savetxt('AA_Ch' + chanNo1 + '-' + chanNo2 + '_Y.txt', Yout)
+    np.savetxt(sensorDataDir+'AA_Ch' + chanNo1 + '-' + chanNo2 + '_X.txt', Xout)
+    np.savetxt(sensorDataDir+'AA_Ch' + chanNo1 + '-' + chanNo2 + '_Y.txt', Yout)
