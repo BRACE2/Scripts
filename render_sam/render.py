@@ -53,8 +53,7 @@ matplotlib
 #
 # The script may be invoked with the following options:
 
-NAME = "skeletal.py"
-HELP = f"""
+HELP = """
 usage: {NAME} <sam-file>
        {NAME} --setup ...
        {NAME} [options] <sam-file>
@@ -116,8 +115,8 @@ Examples:
 # - Command line processing
 #
 
-# Defaults
-#=========
+# Configuring
+#============
 # The following configuration options are available:
 
 Config = lambda : {
@@ -169,9 +168,6 @@ def _apply_config(conf, opts):
             opts[k] = v
 
 
-# The following Tcl script can be used to create a results
-# file
-
 import sys, os
 from collections import defaultdict
 
@@ -187,7 +183,6 @@ except:
     Array = list
     FLOAT =  float
 
-NDM=3 # this script currently assumes ndm=3
 
 # Data shaping / Misc.
 #----------------------------------------------------
@@ -208,19 +203,27 @@ def clean_model(sam:dict, shift: Array = None, rot=None)->dict:
     except KeyError:
         pass
 
-    R = np.eye(3) if rot is None else rot
+    ndm = 3
+    R = np.eye(ndm) if rot is None else rot
 
     geom = sam.get("geometry", sam.get("assembly"))
     if shift is None:
-        shift = np.zeros(3)
+        shift = np.zeros(ndm)
     else:
         shift = np.asarray(shift)
+    try:
+        #coord = np.array([R@n.pop("crd") for n in geom["nodes"]], dtype=FLOAT) + shift
+        coord = np.array([R@n["crd"] for n in geom["nodes"]], dtype=FLOAT) + shift
+    except:
+        coord = np.array([R@[*n.pop("crd"), 0.0] for n in geom["nodes"]], dtype=FLOAT) + shift
 
-    coord = np.array([R@n.pop("crd") for n in geom["nodes"]], dtype=FLOAT) + shift
     nodes = {
-            n["name"]: {**n, "crd": coord[i], "idx": i} 
+            n["name"]: {**n, "crd": coord[i], "idx": i}
                 for i,n in enumerate(geom["nodes"])
     }
+
+    ndm = len(next(iter(nodes.values()))["crd"])
+
 
     try:
         trsfm = {t["name"]: t for t in sam["properties"]["crdTransformations"]}
@@ -229,14 +232,146 @@ def clean_model(sam:dict, shift: Array = None, rot=None)->dict:
 
     elems =  {
       e["name"]: dict(
-        **e, 
+        **e,
         crd=np.array([nodes[n]["crd"] for n in e["nodes"]], dtype=FLOAT),
-        trsfm=trsfm[e["crdTransformation"]] 
+        trsfm=trsfm[e["crdTransformation"]]
             if "crdTransformation" in e and e["crdTransformation"] in trsfm else None
       ) for e in geom["elements"]
     }
-    return dict(nodes=nodes, assembly=elems, coord=coord)
 
+    try:
+        sections = {s["name"]: s for s in sam["properties"]["sections"]}
+    except:
+        sections = {}
+
+    output = dict(nodes=nodes, assembly=elems, coord=coord, sam=sam, sections=sections, ndm=ndm)
+
+    if "prototypes" in sam:
+        output.update({"prototypes": sam["prototypes"]})
+    return output
+
+# Alpha shape utilities
+#-----------------------------------------------------------------------
+def find_edges_with(i, edge_set):
+    i_first = [j for (x,j) in edge_set if x==i]
+    i_second = [j for (j,x) in edge_set if x==i]
+    return i_first,i_second
+
+def stitch_boundaries(edges):
+    edge_set = edges.copy()
+    boundary_lst = []
+    while len(edge_set) > 0:
+        boundary = []
+        edge0 = edge_set.pop()
+        boundary.append(edge0)
+        last_edge = edge0
+        while len(edge_set) > 0:
+            i,j = last_edge
+            j_first, j_second = find_edges_with(j, edge_set)
+            if j_first:
+                edge_set.remove((j, j_first[0]))
+                edge_with_j = (j, j_first[0])
+                boundary.append(edge_with_j)
+                last_edge = edge_with_j
+            elif j_second:
+                edge_set.remove((j_second[0], j))
+                edge_with_j = (j, j_second[0])  # flip edge rep
+                boundary.append(edge_with_j)
+                last_edge = edge_with_j
+
+            if edge0[0] == last_edge[1]:
+                break
+
+        boundary_lst.append(boundary)
+    return boundary_lst
+
+def alpha_shape(points, alpha=2.0, only_outer=True):
+    from scipy.spatial import Delaunay
+    """
+    Compute the alpha shape (concave hull) of a set of points.
+    :param points: np.array of shape (n,2) points.
+    :param alpha: alpha value.
+    :param only_outer: boolean value to specify if we keep only the outer border
+    or also inner edges.
+    :return: set of (i,j) pairs representing edges of the alpha-shape. (i,j) are
+    the indices in the points array.
+    """
+    assert points.shape[0] > 3, "Need at least four points"
+
+    def add_edge(edges, i, j):
+        """
+        Add an edge between the i-th and j-th points,
+        if not in the list already
+        """
+        if (i, j) in edges or (j, i) in edges:
+            # already added
+            assert (j, i) in edges, "Can't go twice over same directed edge right?"
+            if only_outer:
+                # if both neighboring triangles are in shape, it's not a boundary edge
+                edges.remove((j, i))
+            return
+        edges.add((i, j))
+
+    tri = Delaunay(points)
+    edges = set()
+    # Loop over triangles:
+    # ia, ib, ic = indices of corner points of the triangle
+    for ia, ib, ic in tri.vertices:
+        pa = points[ia]
+        pb = points[ib]
+        pc = points[ic]
+        # Computing radius of triangle circumcircle
+        # www.mathalino.com/reviewer/derivation-of-formulas/derivation-of-formula-for-radius-of-circumcircle
+        a = np.sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
+        b = np.sqrt((pb[0] - pc[0]) ** 2 + (pb[1] - pc[1]) ** 2)
+        c = np.sqrt((pc[0] - pa[0]) ** 2 + (pc[1] - pa[1]) ** 2)
+        s = (a + b + c) / 2.0
+        area = np.sqrt(s * (s - a) * (s - b) * (s - c))
+        circum_r = a * b * c / (4.0 * area)
+        if circum_r < alpha:
+            add_edge(edges, ia, ib)
+            add_edge(edges, ib, ic)
+            add_edge(edges, ic, ia)
+    return points[stitch_boundaries(edges)]
+
+
+def get_section_shape(section, sections=None, outlines=None):
+    from scipy.spatial import ConvexHull
+    if "section" in section:
+        if section["section"] not in outlines:
+            outlines[section["name"]] = get_section_shape(sections[section["section"]], sections, outlines)
+    elif "fibers" in section:
+        #outlines[section["name"]] = alpha_shape(np.array([f["coord"] for f in section["fibers"]]))
+        points = np.array([f["coord"] for f in section["fibers"]])
+        outlines[section["name"]] = points[ConvexHull(points).vertices]
+    return outlines[section["name"]]
+
+
+
+
+
+def get_section_geometries(model):
+    sections, outlines = {}, {}
+    for name,section in model["sections"].items():
+        get_section_shape(section, model["sections"], outlines)
+    import json
+    class JSON_Encoder(json.JSONEncoder):
+        """ <cropped for brevity> """
+        def default(self, obj):
+            if isinstance(obj, (np.ndarray, np.number)):
+                return obj.tolist()
+            elif isinstance(obj, (complex, np.complex)):
+                return [obj.real, obj.imag]
+            elif isinstance(obj, set):
+                return list(obj)
+            elif isinstance(obj, bytes):  # pragma: py3
+                return obj.decode()
+            return json.JSONEncoder.default(self, obj)
+
+    return {
+        elem["name"]: [outlines[s] for s in elem["sections"]][0]
+        for elem in model["sam"]["geometry"]["elements"] if "sections" in elem
+    }
 
 def read_displacements(res_file):
     from urllib.parse import urlparse
@@ -329,7 +464,6 @@ def displaced_profile(
 
 
 
-
 VIEWS = { # pre-defined plot views
     "plan":    dict(azim=  0, elev= 90),
     "sect":    dict(azim=  0, elev=  0),
@@ -338,9 +472,10 @@ VIEWS = { # pre-defined plot views
 }
 
 class SkeletalRenderer:
-    def __init__(self, model, response=None, loc=None, vert=2, **kwds):
+    def __init__(self, model, response=None, ndf=None, loc=None, vert=2, **kwds):
         self.ndm = 3
-        ndf = 6
+
+        if ndf is None: ndf = 6
 
         if vert == 3:
             R = np.eye(3)
@@ -349,10 +484,22 @@ class SkeletalRenderer:
                           (0,0,-1),
                           (0,1, 0)))
 
-        rep = self.ndm - 1
-        self.dofs2plot = block_diag(*[R]*rep)
-
         self.model = clean_model(model, shift=loc, rot=R)
+
+        # Create permutation matrix
+        if self.model["ndm"] == 2:
+            P = np.array(((1,0, 0),
+                          (0,1, 0),
+                          (0,0, 0),
+
+                          (0,0, 0),
+                          (0,0, 0),
+                          (0,0, 1)))
+        else:
+            P = np.eye(6)
+
+        self.dofs2plot = block_diag(*[R]*2)@P
+
 
         self.response_layers = defaultdict(lambda : np.zeros((len(self.model["nodes"]), ndf)))
 
@@ -383,8 +530,7 @@ class SkeletalRenderer:
         displ_array[:,3:] *= scale/100
         displ_array[:,:3] *= scale
         return name
-            
-    
+
     def add_displacement_case(self, displ, name=None, scale=1.0):
         tol = 1e-14
         displ_array = self.response_layers[name]
@@ -397,6 +543,7 @@ class SkeletalRenderer:
 
         # apply cutoff
         displ_array[np.abs(displ_array) < tol] = 0.0
+
         # apply scale
         displ_array *= scale
         return name
@@ -432,10 +579,88 @@ class SkeletalRenderer:
         uvw = np.eye(3)*scale
         self.canvas.plot_vectors(xyz, uvw)
 
-    def plot_frame_axes(self): ...
+    def plot_frame_axes(self): ... # TODO
 
-    def plot_frame_names(self):
-        coords = self._frame_coords.reshape(-1,4,3)[:,-3]
+    def add_elem_data(self):
+        N = 3
+        coords = np.zeros((len(self.model["assembly"])*(N+1),self.ndm))
+        coords.fill(np.nan)
+        for i,el in enumerate(self.model["assembly"].values()):
+            coords[(N+1)*i:(N+1)*i+N,:] = np.linspace(*el["crd"], N)
+
+        coords = coords.reshape(-1,4,3)[:,-3]
+
+        x,y,z = coords.T
+        keys  = ["tag",]
+        frames = np.array(list(self.model["assembly"].keys()),dtype=FLOAT)[:,None]
+        try:
+            # TODO: Make this nicer
+            self.canvas.data.append({
+                    "name": "frames",
+                    "x": x, "y": y, "z": z,
+                    "type": "scatter3d","mode": "markers",
+                    "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
+                    "customdata": frames,
+                    "opacity": 0
+                    #"marker": {"opacity": 0.0,"size": 0.0, "line": {"width": 0.0}}
+            })
+        except:
+            pass
+
+    def add_elem_data(self):
+        N = 3
+        exclude_keys = {"type", "instances", "nodes", "crd", "crdTransformation"}
+
+        if "prototypes" not in self.model:
+            elem_types = defaultdict(lambda: defaultdict(list))
+            for elem in self.model["assembly"].values():
+                elem_types[elem["type"]]["elems"].append(elem["name"])
+                elem_types[elem["type"]]["coords"].append(elem["crd"])
+                elem_types[elem["type"]]["data"].append([
+                    str(v) for k,v in elem.items() if k not in exclude_keys
+                ])
+                if "keys" not in elem_types[elem["type"]]:
+                    elem_types[elem["type"]]["keys"] = [
+                        k for k in elem.keys() if k not in exclude_keys
+                    ]
+        else:
+            elem_types = {
+                f"{elem['type']}<{elem['name']}>": {
+                    "elems": [self.model["assembly"][i]["name"] for i in elem["instances"]],
+                    "data":  [
+                        [str(v) for k,v in elem.items() if k not in exclude_keys]
+                        #for _ in range(len(elem["instances"]))
+                    ]*(len(elem["instances"])),
+                    "coords": [self.model["assembly"][i]["crd"] for i in elem["instances"]],
+                    "keys":   [k for k in elem.keys() if k not in exclude_keys]
+
+                } for elem in self.model["prototypes"]["elements"]
+            }
+
+        for name, elem in elem_types.items():
+            coords = np.zeros((len(elem["elems"])*(N+1),self.ndm))
+            coords.fill(np.nan)
+            for i,crd in enumerate(elem["coords"]):
+                coords[(N+1)*i:(N+1)*i+N,:] = np.linspace(*crd, N)
+
+            # coords = coords.reshape(-1,4,N)[:,-N]
+            coords = coords.reshape(-1,4,3)[:,-3]
+
+            x,y,z = coords.T
+            keys  = elem["keys"]
+            data = np.array(elem["data"])
+
+            # TODO: Make this nicer
+            self.canvas.data.append({
+                "name": name,
+                "x": x, "y": y, "z": z,
+                "type": "scatter3d", "mode": "markers", # "lines", #
+                "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
+                "customdata": data,
+                "opacity": 0 if "zerolength" not in name.lower() else 0.6
+                #"marker": {"opacity": 0.0,"size": 0.0, "line": {"width": 0.0}}
+            })
+
 
     def plot_chords(self, assembly, displ=None):
         frame = self.model
@@ -447,18 +672,22 @@ class SkeletalRenderer:
         for i,el in enumerate(frame["assembly"].values()):
             coords[(N+1)*i:(N+1)*i+N,:] = np.linspace(*el["crd"], N)
 
+        # self._frame_coords = coords
+
         self.canvas.plot_lines(coords)
 
     def plot_extruded_frames(self):
-        sections = {"name": ((+0.5, -2.0), 
-                             (+0.5,  1.5),
-                             (+2.0,  1.5),
-                             (+2.0,  2.0),
-                             (-2.0,  2.0), 
-                             (-2.0,  1.5),
-                             (-0.5,  1.5),
-                             (-0.5, -2.0))}
-        name = "name"
+        sections = get_section_geometries(self.model)
+        # sections = {"name": ((+0.5, -2.0), 
+        #                     (+0.5,  1.5),
+        #                     (+2.0,  1.5),
+        #                     (+2.0,  2.0),
+        #                     (-2.0,  2.0), 
+        #                     (-2.0,  1.5),
+        #                     (-0.5,  1.5),
+        #                     (-0.5, -2.0))}
+        #name = "name"
+
         nodes = self.model["nodes"]
         N = 2
         #N = 11 if displ is not None else 2
@@ -466,14 +695,25 @@ class SkeletalRenderer:
         coords = []
         triang = []
         I = 0
+        UNKNOWN_SCALE = 1.0 # 25
         for i,el in enumerate(self.model["assembly"].values()):
-            sect = sections[name]
+            try:
+                sect = sections[el["name"]]
+            except:
+                if int(el["name"]) < 1e3:
+                    sect = self.config["default_section"]
+                else:
+                    sect = np.array([
+                        [-48, -48],
+                        [ 48, -48],
+                        [ 48,  48],
+                        [-48,  48]])
             ne = len(sect)
             X  = np.linspace(*el["crd"], N)
             R  = rotation(el["crd"], None)
             for j in range(N):
                 for k,edge in enumerate(sect):
-                    coords.append(X[j  , :] + 25*R.T@[0, *edge])
+                    coords.append(X[j  , :] + UNKNOWN_SCALE*R.T@[0, *edge])
                     if j == 0:
                         continue
 
@@ -495,8 +735,11 @@ class SkeletalRenderer:
         self.canvas.data.append({
             #"name": label if label is not None else "",
             "type": "mesh3d",
+            "color": "gray",
             "x": x, "y": y, "z": z, "i": i, "j": j, "k": k,
             "hoverinfo":"skip",
+            "opacity": 0.4,
+            "color": "cyan"
             # "opacity": 0.65
         })
 
@@ -506,7 +749,7 @@ class SkeletalRenderer:
             tri_points = np.array([
                 coords[i] for i in np.array(triang).reshape(-1)
             ])
-            Xe, Ye, Ze = tri_points.T 
+            Xe, Ye, Ze = tri_points.T
             self.canvas.data.append({
                 "type": "scatter3d",
                 "mode": "lines",
@@ -539,18 +782,22 @@ class SkeletalRenderer:
 
         self.canvas.plot_lines(coords, color="red", label=label)
 
-    def plot_nodes(self, displ=None):
+    def plot_nodes(self, displ=None, data=None):
         coord = self.model["coord"]
         if displ is not None:
             coord = coord + displ[:, :self.ndm]
-        self.canvas.plot_nodes(coord)
+        self.canvas.plot_nodes(coord, data=data)
 
 
     def plot(self):
         if "frames" in self.config["show_objects"]:
             self.plot_chords(self.model["assembly"])
+            try:
+                self.add_elem_data()
+            except:
+                pass
         if "nodes" in self.config["show_objects"]:
-            self.plot_nodes()
+            self.plot_nodes(data=list(np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]))
         if "origin" in self.config["show_objects"]:
             self.plot_origin(self.config["scale"])
 
@@ -600,11 +847,11 @@ class MatplotlibCanvas:
         props = conf or {"color": color or "grey", "alpha": 0.6, "linewidth": 0.5}
         self.ax.plot(*coords.T, **props)
 
-    def plot_nodes(self, coords, label=None, conf=None):
+    def plot_nodes(self, coords, label=None, conf=None, data=None):
         ax = self.ax
         props = {"color": "black",
                  "marker": "s",
-                 "s": 2,
+                 "s": 0.1,
                  "zorder": 2
         }
         self.ax.scatter(*coords.T, **props)
@@ -614,7 +861,7 @@ class MatplotlibCanvas:
 
     def plot_trisurf(self, xyz, ijk):
         ax.plot_trisurf(*xyz.T, triangles=ijk)
-    
+
 
 
 class PlotlyCanvas:
@@ -670,18 +917,17 @@ class PlotlyCanvas:
         }
 
 
-    def plot_nodes(self, coords, label = None, props=None):
+    def plot_nodes(self, coords, label = None, props=None, data=None):
         name = label or "nodes"
         x,y,z = coords.T
         keys  = ["tag",]
-        # nodes = np.array(list(self.model["nodes"].keys()),dtype=FLOAT)[:,None]
 
         data = {
                 "name": name,
                 "x": x, "y": y, "z": z,
                 "type": "scatter3d","mode": "markers",
                 "hovertemplate": "<br>".join(f"{k}: %{{customdata[{v}]}}" for v,k in enumerate(keys)),
-                # "customdata": list(nodes),
+                "customdata": data,
                 "marker": {
                     "symbol": "square",
                     **self.config["objects"]["nodes"]["default"]
@@ -727,7 +973,7 @@ class PlotlyCanvas:
 
 AXES = dict(zip(("long","tran","vert","sect","elev", "plan"), range(6)))
 
-def dof_index(dof:str):
+def dof_index(dof: str):
     try: return int(dof)
     except: return AXES[dof]
 
@@ -744,7 +990,7 @@ def parse_args(argv)->dict:
     for arg in args:
         try:
             if arg == "--help" or arg == "-h":
-                print(HELP)
+                print(HELP.format(NAME=sys.argv[0]))
                 sys.exit()
 
             elif arg == "--gnu":
@@ -767,6 +1013,7 @@ def parse_args(argv)->dict:
                 for nd in node_dof.split(","):
                     node, dof = nd.split(":")
                     opts["displ"][int(node)].append(dof_index(dof))
+
             elif arg[:6] == "--disp":
                 node_dof = next(args)
                 for nd in node_dof.split(","):
@@ -786,12 +1033,15 @@ def parse_args(argv)->dict:
                 opts["show_objects"].extend(next(args).split(","))
 
             elif arg == "--hide":
-                opts["show_objects"].pop(next(args))
-            
+                opts["show_objects"].pop(opts["show_objects"].index(next(args)))
+
             elif arg[:2] == "-V":
                 opts["view"] = arg[2:] if len(arg) > 2 else next(args)
             elif arg == "--view":
                 opts["view"] = next(args)
+
+            elif arg == "--default-section":
+                opts["default_section"] = np.loadtxt(next(args))
 
             elif arg[:2] == "-m":
                 opts["mode_num"] = int(arg[2]) if len(arg) > 2 else int(next(args))
@@ -848,8 +1098,8 @@ def install_me(install_opt=None):
           version=__version__,
           description="",
           long_description=textwrap.indent(HELP, ">\t\t"),
-          author="", 
-          author_email="", 
+          author="",
+          author_email="",
           url="",
           py_modules=[package],
           scripts=[name],
@@ -881,7 +1131,7 @@ def render(sam_file, res_file=None, **opts):
     else:
         model = sam_file
 
-    if "RendererConfiguration" in model: 
+    if "RendererConfiguration" in model:
         _apply_config(model["RendererConfiguration"], config)
 
     _apply_config(opts, config)
@@ -915,10 +1165,12 @@ if __name__ == "__main__":
 
     try:
         render(**config)
+
     except (FileNotFoundError,RenderError) as e:
-        # Catch expected errors to avoid printing an ugly/unnecessary
-        # stack trace.
+        # Catch expected errors to avoid printing an ugly/unnecessary stack trace.
         print(e, file=sys.stderr)
-        print(f"         Run '{NAME} --help' for more information", file=sys.stderr)
+        print("         Run '{NAME} --help' for more information".format(NAME=sys.argv[0]), file=sys.stderr)
         sys.exit()
+
+
 
