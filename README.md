@@ -1,5 +1,15 @@
 # BRACE2 Scripts
 
+- `ssid` System Identification
+- `sees` Visualization
+- `sdof` SDOF integration
+- `quakeio` Parsing
+- `HMP`
+- `HMP:apps/inventory/scripts` Scraping bridge data
+- `./preprocessing`
+- `./postprocessing`
+- `opensees.sections` Section rendering / processing
+
 ## To-Do
 - **Demonstration**
   - **Requirements**
