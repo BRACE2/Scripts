@@ -5,6 +5,7 @@
 - `sdof` SDOF integration
 - `xsection`
 - `quakeio` Parsing
+- `CE58658` Bridge model pre-processing
 - `HMP`
 - `HMP:apps/events`              Motion API
 - `HMP:apps/inventory/scripts`   Scraping bridge data
