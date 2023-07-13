@@ -3,9 +3,11 @@
 - `ssid` System Identification
 - `sees` Visualization
 - `sdof` SDOF integration
+- `xsection`
 - `quakeio` Parsing
 - `HMP`
-- `HMP:apps/inventory/scripts` Scraping bridge data
+- `HMP:apps/events`              Motion API
+- `HMP:apps/inventory/scripts`   Scraping bridge data
 - `./preprocessing`
 - `./postprocessing`
 - `opensees.sections` Section rendering / processing
