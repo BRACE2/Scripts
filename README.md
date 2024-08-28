@@ -13,6 +13,7 @@
 - `./postprocessing`
 - `opensees.sections` Section rendering / processing
 
+<!--
 ## To-Do
 - **Demonstration**
   - **Requirements**
@@ -36,7 +37,7 @@
 
 - **January**
 
-----------------------------------------
+-->
 
 
 <details>
@@ -69,14 +70,13 @@
 </details>
 
 ### Scripts
-complete-ish
+
 - `quakeio <motion.zip>`
 - `postprocessing/compareRH {method} <sensorRH> <modelRH>`
 - `renderModel <modelDef> [nodalResponse]`
 - `postprocessing/getSensorResponse <event.zip>`
 - `preprocessing/makePattern <event.zip>`
 
-under development
 
 <details><summary><code>fiberStrains <sectionResponse> -> {ele: coords/strains}</code> section response to strains
 </summary>
