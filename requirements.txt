@@ -4,3 +4,4 @@ matplotlib
 opensees>=0.0.65
 sees
 mdof
+shps
