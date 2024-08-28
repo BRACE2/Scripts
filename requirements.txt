@@ -1,0 +1,6 @@
+numpy
+pandas
+matplotlib
+opensees>=0.0.65
+sees
+mdof
